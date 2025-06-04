@@ -73,7 +73,7 @@ class LLMProcessor:
                 action="response_start",
                 data={
                     "transcript": transcript,
-                    "has_image": image_base64 is not None
+                    "imageBase64": image_base64
                 }
             ))
             

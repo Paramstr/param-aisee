@@ -7,6 +7,7 @@ interface Message {
   content: string;
   timestamp: Date;
   isComplete: boolean;
+  imageBase64?: string;
 }
 
 interface RawTranscript {
@@ -28,10 +29,13 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [rawTranscripts, setRawTranscripts] = useState<RawTranscript[]>([]);
   const [currentResponse, setCurrentResponse] = useState<string>('');
+  const [currentResponseImageBase64, setCurrentResponseImageBase64] = useState<string | null>(null);
   const [inputMessage, setInputMessage] = useState('');
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState('');
   const [showDebugPanel, setShowDebugPanel] = useState(true);
+  const [isImagePopupOpen, setIsImagePopupOpen] = useState(false);
+  const [popupImageUrl, setPopupImageUrl] = useState<string | null>(null);
   
   // Use refs for state that doesn't need re-renders or is derived
   const isProcessing = useRef(false);
@@ -249,23 +253,43 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
             break;
             
           case 'context_ready':
-            // Context accumulation complete, transcript ready for LLM
             const transcript = lastEvent.data?.transcript;
+            let shouldAddNewUserMessage = true;
+
             if (transcript) {
-              const userMessage: Message = {
-                id: Date.now().toString(),
-                type: 'user',
-                content: transcript,
-                timestamp: new Date(),
-                isComplete: true
-              };
-              setMessages(prev => [...prev, userMessage]);
+              const lastClientMessage = messages[messages.length - 1];
+              // If the last message in UI is a user message and has the exact same content,
+              // assume this event is the backend confirmation of a manually sent message
+              // that was already added optimistically. Avoid adding it again.
+              if (
+                lastClientMessage &&
+                lastClientMessage.type === 'user' &&
+                lastClientMessage.content === transcript
+              ) {
+                shouldAddNewUserMessage = false;
+              }
+
+              if (shouldAddNewUserMessage) {
+                const userMessage: Message = {
+                  id: Date.now().toString(),
+                  type: 'user',
+                  content: transcript,
+                  timestamp: new Date(),
+                  isComplete: true
+                };
+                setMessages(prev => [...prev, userMessage]);
+              }
             }
             
-            // Reset context mode and display
+            // Context accumulation (whether voice or triggered by manual send) is now complete.
+            // Reset related states.
             isInContextMode.current = false;
             currentContext.current = '';
-            isTranscribing.current = false;
+            // Setting isTranscribing to false here. This is generally correct as context_ready 
+            // implies transcription leading to it is done. If text input heavily overlaps active 
+            // voice transcription, this might need a more nuanced handling, but for typical 
+            // text sends, this is fine.
+            isTranscribing.current = false; 
             break;
         }
         break;
@@ -275,6 +299,37 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
           case 'response_start':
             setCurrentResponse('');
             isProcessing.current = true;
+
+            const eventDataForResponseStart = lastEvent.data;
+            if (eventDataForResponseStart?.imageBase64) {
+              setCurrentResponseImageBase64(eventDataForResponseStart.imageBase64);
+
+              // Attempt to update the last user message with this image
+              setMessages(prevMessages => {
+                if (prevMessages.length === 0) return prevMessages;
+                const lastMessageIndex = prevMessages.length - 1;
+                const lastMessage = prevMessages[lastMessageIndex];
+
+                if (
+                  lastMessage.type === 'user' &&
+                  !lastMessage.imageBase64 &&
+                  eventDataForResponseStart.transcript &&
+                  lastMessage.content === eventDataForResponseStart.transcript
+                ) {
+                  const updatedMessages = [...prevMessages];
+                  updatedMessages[lastMessageIndex] = {
+                    ...lastMessage,
+                    imageBase64: eventDataForResponseStart.imageBase64 !== null 
+                                   ? eventDataForResponseStart.imageBase64 
+                                   : undefined,
+                  };
+                  return updatedMessages;
+                }
+                return prevMessages;
+              });
+            } else {
+              setCurrentResponseImageBase64(null);
+            }
             break;
             
           case 'response_chunk':
@@ -292,11 +347,13 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
                 type: 'assistant',
                 content: fullResponse,
                 timestamp: new Date(),
-                isComplete: true
+                isComplete: true,
+                imageBase64: currentResponseImageBase64 !== null ? currentResponseImageBase64 : undefined
               };
               setMessages(prev => [...prev, assistantMessage]);
               setCurrentResponse('');
               isProcessing.current = false;
+              setCurrentResponseImageBase64(null);
             }
             break;
         }
@@ -309,6 +366,17 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
   };
   
   const statusInfo = getStatusInfo();
+  
+  // Image popup handlers
+  const openImagePopup = (imageUrl: string) => {
+    setPopupImageUrl(imageUrl);
+    setIsImagePopupOpen(true);
+  };
+
+  const closeImagePopup = () => {
+    setIsImagePopupOpen(false);
+    setPopupImageUrl(null);
+  };
   
   return (
     <div className={`bg-gray-900 rounded-lg p-4 flex flex-col h-full ${className}`}>
@@ -474,9 +542,33 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
                 </div>
               ) : (
                 <>
-                  <div className="text-sm mb-1">
-                    {message.content}
+                  <div className="mb-1">
+                    {message.type === 'user' && message.imageBase64 ? (
+                      <div className="flex items-start space-x-2">
+                        <img
+                          src={`data:image/jpeg;base64,${message.imageBase64}`}
+                          alt="User context"
+                          className="rounded-md max-w-[80px] max-h-[80px] cursor-pointer hover:opacity-80 transition-opacity"
+                          onClick={() => openImagePopup(`data:image/jpeg;base64,${message.imageBase64}`)}
+                        />
+                        <div className="text-sm flex-1">{message.content}</div>
+                      </div>
+                    ) : (
+                      <div className="text-sm">
+                        {message.content}
+                      </div>
+                    )}
+
+                    {message.type === 'assistant' && message.imageBase64 && (
+                      <img
+                        src={`data:image/jpeg;base64,${message.imageBase64}`}
+                        alt="Assistant context"
+                        className="mt-2 rounded-md max-w-[150px] max-h-[150px] cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => openImagePopup(`data:image/jpeg;base64,${message.imageBase64}`)}
+                      />
+                    )}
                   </div>
+
                   <div className="flex items-center justify-between">
                     <div
                       className={`text-xs opacity-70 ${
@@ -485,12 +577,14 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
                     >
                       {formatTime(message.timestamp)}
                     </div>
-                    <button
-                      onClick={() => startEditingMessage(message.id, message.content)}
-                      className="text-xs opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-600 px-1 py-0.5 rounded"
-                    >
-                      ✏️
-                    </button>
+                    {message.type === 'user' && (
+                      <button
+                        onClick={() => startEditingMessage(message.id, message.content)}
+                        className="text-xs opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-600 px-1 py-0.5 rounded"
+                      >
+                        ✏️
+                      </button>
+                    )}
                   </div>
                 </>
               )}
@@ -504,7 +598,13 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
             <div className="max-w-[80%] bg-gray-700 text-gray-100 rounded-lg px-3 py-2">
               <div className="text-sm mb-1">
                 {currentResponse}
-                <span className="animate-pulse">▋</span>
+                {currentResponseImageBase64 && (
+                  <img
+                    src={`data:image/jpeg;base64,${currentResponseImageBase64}`}
+                    alt="Current context"
+                    className="mt-2 rounded-md max-w-[150px] max-h-[150px]"
+                  />
+                )}
               </div>
               <div className="text-xs text-gray-400 opacity-70">
                 {formatTime(new Date())}
@@ -544,6 +644,32 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
         <div className={`w-2 h-2 rounded-full mr-2 ${statusInfo.color} ${statusInfo.color.includes('animate-pulse') || isTranscribing.current || isProcessing.current || isInContextMode.current ? 'animate-pulse' : ''}`} />
         {statusInfo.text}
       </div>
+
+      {/* Image Popup Modal */}
+      {isImagePopupOpen && popupImageUrl && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+          onClick={closeImagePopup}
+        >
+          <div 
+            className="bg-gray-900 p-4 rounded-lg shadow-xl relative max-w-full max-h-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={closeImagePopup}
+              className="absolute top-3 right-3 text-white bg-gray-700 hover:bg-gray-600 rounded-full p-1 text-2xl leading-none z-10"
+              aria-label="Close image viewer"
+            >
+              &times;
+            </button>
+            <img 
+              src={popupImageUrl} 
+              alt="Enlarged view" 
+              className="max-w-[90vw] max-h-[90vh] object-contain rounded" 
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 } 
