@@ -1,12 +1,12 @@
 import asyncio
 import logging
-import aiohttp
 import json
 import subprocess
 import threading
 from typing import Optional, AsyncGenerator, Dict, Any
 import base64
 import concurrent.futures
+from openai import AsyncOpenAI
 
 from ..config import settings
 from ..events import Event, EventType, event_bus
@@ -20,7 +20,7 @@ class LLMProcessor:
         # Dependency injection
         self.io_pool = io_pool
         
-        self.session: Optional[aiohttp.ClientSession] = None
+        self.client: Optional[AsyncOpenAI] = None
         self.is_processing = False
         
         # TTS state
@@ -28,16 +28,18 @@ class LLMProcessor:
         
     async def start(self):
         """Initialize the LLM processor"""
-        if self.session is None:
-            timeout = aiohttp.ClientTimeout(total=60)
-            self.session = aiohttp.ClientSession(timeout=timeout)
-        logger.info("LLM processor started")
+        if self.client is None:
+            self.client = AsyncOpenAI(
+                base_url="https://openrouter.ai/api/v1",
+                api_key=settings.openrouter_api_key,
+            )
+        logger.info("LLM processor started with OpenAI client")
     
     async def stop(self):
         """Stop the LLM processor"""
-        if self.session:
-            await self.session.close()
-            self.session = None
+        if self.client:
+            await self.client.close()
+            self.client = None
         
         # Stop any running TTS
         if self.tts_process:
@@ -63,8 +65,8 @@ class LLMProcessor:
             if vision_processor:
                 image_base64 = vision_processor.capture_frame_for_llm()
             
-            # Build the prompt with conversation context
-            prompt = self._build_prompt(transcript, image_base64 is not None)
+            # Build the messages for the API
+            messages = self._build_messages(transcript, image_base64)
             
             await event_bus.publish(Event(
                 type=EventType.LLM_EVENT,
@@ -77,7 +79,7 @@ class LLMProcessor:
             
             # Call LLM API
             response_text = ""
-            async for chunk in self._call_llm_api(prompt, image_base64):
+            async for chunk in self._call_llm_api(messages):
                 response_text += chunk
                 await event_bus.publish(Event(
                     type=EventType.LLM_EVENT,
@@ -109,9 +111,10 @@ class LLMProcessor:
         finally:
             self.is_processing = False
     
-    def _build_prompt(self, transcript: str, has_image: bool) -> str:
-        """Build the system prompt for the LLM"""
-        base_prompt = """You are Osmo, an AI assistant with vision and speech capabilities. You can see through a camera and respond to user queries about what you observe.
+    def _build_messages(self, transcript: str, image_base64: Optional[str]) -> list:
+        """Build the messages array for the OpenAI API"""
+        # System message
+        system_prompt = """You are Osmo, an AI assistant with vision and speech capabilities. You can see through a camera and respond to user queries about what you observe.
 
 Key traits:
 - Be conversational and helpful
@@ -123,37 +126,24 @@ Key traits:
 
 """
         
-        # Add conversation context (optimized)
+        # Add conversation context
         conversation_context = conversation_storage.get_conversation_context(limit=5)
         if conversation_context:
-            base_prompt += f"Recent conversation:\n{conversation_context}\n\n"
+            system_prompt += f"Recent conversation:\n{conversation_context}\n\n"
         
-        if has_image:
-            base_prompt += "You can see the current camera view. "
+        if image_base64:
+            system_prompt += "You can see the current camera view in the image provided."
         else:
-            base_prompt += "Camera view is not available. "
+            system_prompt += "Camera view is not available."
         
-        base_prompt += f"User said: \"{transcript}\""
+        messages = [
+            {
+                "role": "system",
+                "content": system_prompt
+            }
+        ]
         
-        return base_prompt
-    
-    async def _call_llm_api(self, prompt: str, image_base64: Optional[str]) -> AsyncGenerator[str, None]:
-        """Call OpenRouter API and stream response"""
-        if not self.session:
-            raise Exception("LLM session not initialized")
-        
-        url = "https://openrouter.ai/api/v1/chat/completions"
-        
-        headers = {
-            "Authorization": f"Bearer {settings.openrouter_api_key}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "http://localhost:3000",
-            "X-Title": "Osmo Assistant"
-        }
-        
-        # Build messages
-        messages = []
-        
+        # User message with optional image
         if image_base64:
             # Vision-enabled message
             messages.append({
@@ -161,7 +151,7 @@ Key traits:
                 "content": [
                     {
                         "type": "text",
-                        "text": prompt
+                        "text": transcript
                     },
                     {
                         "type": "image_url",
@@ -175,46 +165,35 @@ Key traits:
             # Text-only message
             messages.append({
                 "role": "user",
-                "content": prompt
+                "content": transcript
             })
         
-        payload = {
-            "model": settings.openrouter_model,
-            "messages": messages,
-            "max_tokens": settings.max_tokens,
-            "temperature": settings.temperature,
-            "stream": True
-        }
+        return messages
+    
+    async def _call_llm_api(self, messages: list) -> AsyncGenerator[str, None]:
+        """Call OpenRouter API using OpenAI client and stream response"""
+        if not self.client:
+            raise Exception("LLM client not initialized")
         
         try:
-            async with self.session.post(url, json=payload, headers=headers) as response:
-                if response.status != 200:
-                    error_text = await response.text()
-                    raise Exception(f"API error {response.status}: {error_text}")
-                
-                # Stream the response
-                async for line in response.content:
-                    line = line.decode('utf-8').strip()
+            stream = await self.client.chat.completions.create(
+                model=settings.openrouter_model,
+                messages=messages,
+                max_tokens=settings.max_tokens,
+                temperature=settings.temperature,
+                stream=True,
+                extra_headers={
+                    "HTTP-Referer": "http://localhost:3000",
+                    "X-Title": "Osmo Assistant"
+                }
+            )
+            
+            async for chunk in stream:
+                if chunk.choices[0].delta.content is not None:
+                    yield chunk.choices[0].delta.content
                     
-                    if line.startswith('data: '):
-                        data = line[6:]  # Remove 'data: ' prefix
-                        
-                        if data == '[DONE]':
-                            break
-                        
-                        try:
-                            chunk_data = json.loads(data)
-                            delta = chunk_data.get('choices', [{}])[0].get('delta', {})
-                            content = delta.get('content', '')
-                            
-                            if content:
-                                yield content
-                                
-                        except json.JSONDecodeError:
-                            continue
-                            
         except Exception as e:
-            logger.error(f"API call error: {e}")
+            logger.error(f"OpenAI API call error: {e}")
             raise
     
     async def _speak_text(self, text: str):

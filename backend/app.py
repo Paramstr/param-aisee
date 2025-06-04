@@ -1,6 +1,7 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
+from pydantic import BaseModel
 import asyncio
 import logging
 import uvicorn
@@ -17,7 +18,6 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -98,6 +98,26 @@ async def clear_conversation():
     """Clear conversation history"""
     conversation_storage.clear_conversation()
     return {"message": "Conversation history cleared"}
+
+
+class ManualMessageRequest(BaseModel):
+    message: str
+
+
+@app.post("/conversation/send")
+async def send_manual_message(request: ManualMessageRequest):
+    """Send a manual message to the AI for processing"""
+    if not request.message.strip():
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+    
+    # Trigger context ready event with the manual message
+    await event_bus.publish(Event(
+        type=EventType.AUDIO_EVENT,
+        action="context_ready",
+        data={"transcript": request.message.strip()}
+    ))
+    
+    return {"message": "Message sent for processing", "content": request.message.strip()}
 
 
 class ConnectionManager:
@@ -213,5 +233,6 @@ if __name__ == "__main__":
         host=settings.host,
         port=settings.port,
         reload=False,
-        log_level="info"
+        log_level="info",
+        access_log=False  # Disable access logging to prevent /frame spam
     )
