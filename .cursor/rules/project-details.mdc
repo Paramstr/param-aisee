@@ -1,0 +1,107 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Osmo Assistant - Context Prompt
+Before running any pip commands, activate env with `source .venv/bin/activate`
+
+## Project Overview
+
+**Osmo Assistant** is an always-listening, always-watching AI assistant that runs locally on macOS. It combines real-time audio processing, computer vision, and large language models to create an interactive AI companion that can see and respond to its environment.
+
+### Core Functionality
+- **Wake Word Activation**: Responds to "Osmo" wake word using Porcupine
+- **Voice Recognition**: Captures and transcribes speech using Whisper
+- **Computer Vision**: Continuously captures camera feed for visual context
+- **AI Processing**: Sends audio transcripts + camera images to vision-language models
+- **Speech Synthesis**: Responds audibly using macOS text-to-speech
+- **Real-time Dashboard**: Web interface showing live feed, conversations, and system status
+
+### Technology Stack
+- **Backend**: Python 3.11+ with FastAPI, async/await architecture
+- **Frontend**: Next.js 14 with React 18, TypeScript, Tailwind CSS
+- **Audio**: Porcupine (wake word), WebRTC VAD (silence detection), Whisper (transcription)
+- **Vision**: OpenCV for camera capture, JPEG streaming
+- **AI**: OpenRouter API with vision-language models (Qwen 2.5-VL)
+- **Communication**: WebSocket for real-time events, REST for data endpoints
+
+## Architecture Overview
+
+The system uses an **event-driven architecture** with async processing:
+
+1. **Audio Pipeline**: Microphone → Wake Word → Recording → Transcription → Event
+2. **Vision Pipeline**: Camera → Frame Capture → JPEG Encoding → Storage
+3. **AI Pipeline**: Transcript + Image → LLM API → Streaming Response → TTS
+4. **UI Pipeline**: WebSocket Events → React State → Real-time Dashboard
+
+## File Structure
+
+```
+osmo-assistant/
+├── backend/                     # Python FastAPI backend
+│   ├── app.py                  # Main FastAPI application & WebSocket server
+│   ├── config.py               # Pydantic settings (env vars, API keys)
+│   ├── events.py               # Event system (EventBus, EventType enum)
+│   ├── requirements.txt        # Python dependencies
+│   └── core/                   # Core processing modules
+│       ├── audio.py           # Audio processing (Porcupine + Whisper + VAD)
+│       ├── vision.py          # Camera capture (OpenCV + JPEG encoding)
+│       ├── llm.py             # LLM client (OpenRouter API + TTS)
+│       └── tasks.py           # Task coordination & event handling
+├── frontend/                   # Next.js React frontend
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── page.tsx       # Main dashboard layout
+│   │   │   ├── layout.tsx     # Root layout
+│   │   │   └── globals.css    # Global styles
+│   │   ├── components/        # React components
+│   │   │   ├── CameraFeed.tsx # Live camera display
+│   │   │   ├── ChatPanel.tsx  # Conversation interface
+│   │   │   └── StatusBar.tsx  # System status display
+│   │   └── lib/
+│   │       └── useSocket.ts   # WebSocket hook for real-time events
+│   ├── package.json           # Node.js dependencies
+│   └── [Next.js config files]
+├── .env                       # Environment variables (API keys, settings)
+└── README.md                  # Setup and usage documentation
+```
+
+### Key Backend Files
+
+- **`app.py`**: FastAPI server with WebSocket endpoint (`/ws`), camera frame endpoint (`/frame`), health checks, and CORS setup
+- **`config.py`**: Centralized configuration using Pydantic BaseSettings, reads from `.env` file
+- **`events.py`**: Event system with async queue, event types (wake_word_detected, transcript_ready, etc.)
+- **`core/audio.py`**: Audio processing pipeline - sounddevice capture, Porcupine wake word detection, WebRTC VAD, Whisper transcription
+- **`core/vision.py`**: Camera management - OpenCV capture, JPEG encoding, frame storage, thread-safe access
+- **`core/llm.py`**: LLM integration - OpenRouter API calls, streaming responses, TTS using macOS `say` command
+- **`core/tasks.py`**: Task orchestration - starts all background processes, handles events, coordinates pipeline
+
+### Key Frontend Files
+
+- **`page.tsx`**: Main dashboard with 3-column layout (camera feed, chat panel, status bar)
+- **`useSocket.ts`**: WebSocket hook managing connection, reconnection, event parsing, and state management
+- **`CameraFeed.tsx`**: Displays live camera feed by polling `/frame` endpoint at 10 FPS
+- **`ChatPanel.tsx`**: Shows conversation history with streaming AI responses, handles transcript and LLM events
+- **`StatusBar.tsx`**: Real-time system monitoring showing connection status, component health, and recent events
+
+## Event Flow
+
+1. **Startup**: Backend starts all processors (audio, vision, LLM) and event handler
+2. **Listening**: Audio processor continuously monitors for wake word using Porcupine
+3. **Activation**: Wake word detected → starts recording → VAD detects speech end → transcription
+4. **Processing**: Transcript + current camera frame sent to LLM → streaming response
+5. **Output**: LLM response streamed to frontend + converted to speech via TTS
+6. **Dashboard**: All events sent via WebSocket to update frontend in real-time
+
+## Configuration
+
+The system is configured via `.env` file with:
+- **API Keys**: OpenRouter (LLM), Porcupine (wake word)
+- **Audio Settings**: Sample rate, channels, VAD aggressiveness, silence thresholds
+- **Vision Settings**: Camera index, resolution, FPS
+- **LLM Settings**: Model selection, max tokens, temperature
+- **Server Settings**: Host, port, CORS origins
+
+This architecture enables a responsive, real-time AI assistant with <3 second response times from wake word to TTS output.
+

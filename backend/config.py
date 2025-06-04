@@ -1,0 +1,39 @@
+from pydantic_settings import BaseSettings
+from typing import Optional
+
+
+class Settings(BaseSettings):
+    # OpenRouter API configuration
+    openrouter_api_key: str
+    openrouter_model: str = "qwen/qwen2.5-vl-72b-instruct:free"
+
+    
+    # Audio configuration
+    audio_sample_rate: int = 16000
+    audio_channels: int = 1
+    audio_chunk_size: int = 1024
+    vad_aggressiveness: int = 3  # WebRTC VAD aggressiveness (0-3)
+    silence_duration_threshold: float = 2.0  # seconds of silence to stop recording
+    
+    # Vision configuration
+    camera_index: int = 0
+    camera_width: int = 1280
+    camera_height: int = 720
+    camera_fps: int = 60
+    
+    # LLM configuration
+    max_tokens: int = 1000
+    temperature: float = 0.7
+    
+    # Server configuration
+    host: str = "0.0.0.0"
+    port: int = 8000
+    cors_origins: list[str] = ["http://localhost:3000"]
+    
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+
+
+# Global settings instance
+settings = Settings()

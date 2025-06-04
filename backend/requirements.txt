@@ -1,0 +1,10 @@
+fastapi==0.111.*
+uvicorn[standard]==0.30.*
+aiohttp
+sounddevice
+mlx-whisper
+pydantic
+pydantic-settings
+opencv-python-headless
+pillow
+python-dotenv
