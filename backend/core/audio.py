@@ -61,7 +61,7 @@ class AudioProcessor:
         self.should_stop = False
         
         # Wake word keywords (case-insensitive)
-        self.wake_words = ["osmo", "hey osmo", "chat", "hey chat", "hey aisee"]
+        self.wake_words = ["hey", "osmo", "hey osmo", "chat", "hey chat", "hey aisee"]
         
         # Context accumulation settings
         self.silence_threshold = 2.0  # 2 seconds of silence to end context
@@ -338,9 +338,10 @@ class AudioProcessor:
             return
         
         current_time = time.time()
+        transcript_lower = transcript.lower() # For checking "enter"
         
         # Check for wake word
-        if self._contains_wake_word(transcript):
+        if self._contains_wake_word(transcript): # Pass original transcript for wake word check
             logger.info(f"Wake word detected: {transcript}")
             
             # Start context accumulation mode
@@ -355,15 +356,33 @@ class AudioProcessor:
             ))
             
             # Add the full transcript including wake word
-            self.context_buffer.append(transcript)
+            # Don't add if it's just the wake word and nothing else useful.
+            # Or, decide if the "enter" command itself should be part of the context.
+            # For now, let's assume "enter" itself is not part of the context sent to LLM.
+            # If the transcript *is* "enter", it will be handled below.
+            # If the transcript *contains* a wake word but isn't *just* "enter", add it.
+            if transcript_lower != "enter.": # common ASR artifact for "enter"
+                 # also check for "enter" without the period.
+                if transcript_lower != "enter":
+                    self.context_buffer.append(transcript)
             
         elif self.context_mode:
             # We're in context accumulation mode
+            # Check if the command is "enter"
+            if transcript_lower == "enter." or transcript_lower == "enter":
+                logger.info(f'"Enter" command detected. Finalizing context.')
+                # Don't add "enter" to the buffer
+                await self._finalize_context()
+                return # Context finalized, no further processing in this handler for this transcript
+
+            # Not "enter", so add to context buffer
             self.context_buffer.append(transcript)
             self.last_speech_time = current_time
             
         # Check if we should end context accumulation (silence timeout)
+        # This check should only happen if context mode is still active (i.e., "enter" wasn't said)
         if self.context_mode and (current_time - self.last_speech_time) > self.silence_threshold:
+            logger.info(f"Silence threshold reached. Finalizing context.")
             await self._finalize_context()
 
     async def _finalize_context(self):
