@@ -185,6 +185,7 @@ public
 # Temporary folders
 tmp/
 temp/
+conversation_history.json
 
 # Editor directories and files
 .vscode/*
@@ -200,3 +201,4 @@ temp/
 # OS generated files
 Thumbs.db
 .DS_Store 
+conversation_history.json
