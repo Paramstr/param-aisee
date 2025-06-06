@@ -6,6 +6,7 @@ import { ChatPanel } from '@/components/ChatPanel';
 import { StatusBar } from '@/components/StatusBar';
 import { DebugStream } from '@/components/DebugStream';
 import { ToolIndicator } from '@/components/ToolIndicator';
+import { DeviceSelector } from '@/components/DeviceSelector';
 
 export default function Home() {
   const { isConnected, lastEvent, systemStatus, toolState, error } = useSocket('ws://localhost:8000/ws');
@@ -20,7 +21,11 @@ export default function Home() {
             <h1 className="text-xl sm:text-2xl font-bold text-white truncate">Osmo Assistant</h1>
             <p className="text-gray-400 text-xs sm:text-sm">Always-listening, always-watching AI</p>
           </div>
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0 flex items-center space-x-3">
+            {/* Device Selector */}
+            <DeviceSelector />
+            
+            {/* Connection Status */}
             <div className={`flex items-center space-x-2 px-2 sm:px-3 py-1 rounded-full text-xs ${
               isConnected ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'
             }`}>

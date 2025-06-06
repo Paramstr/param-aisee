@@ -159,6 +159,7 @@ class AudioProcessor:
                 samplerate=settings.audio_sample_rate,
                 dtype=np.int16,
                 blocksize=self.frame_size,  # Use VAD frame size
+                device=settings.audio_device_index,  # Use selected audio device
                 callback=self._audio_callback
             ):
                 while not self.should_stop:

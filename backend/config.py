@@ -12,11 +12,12 @@ class Settings(BaseSettings):
     audio_sample_rate: int = 16000
     audio_channels: int = 1
     audio_chunk_size: int = 1024
+    audio_device_index: Optional[int] = None  # None = use system default device
     vad_aggressiveness: int = 3  # WebRTC VAD aggressiveness (0-3)
     silence_duration_threshold: float = 2.0  # seconds of silence to stop recording
     
     # Vision configuration
-    camera_index: int = 0
+    camera_index: int = 0  # Default to first available camera
     camera_width: int = 1280
     camera_height: int = 720
     camera_fps: int = 60

@@ -202,3 +202,6 @@ conversation_history.json
 Thumbs.db
 .DS_Store 
 conversation_history.json
+
+# Osmo Assistant specific files
+backend/recordings/

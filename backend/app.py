@@ -6,6 +6,8 @@ import asyncio
 import logging
 import uvicorn
 from contextlib import asynccontextmanager
+import sounddevice as sd
+import cv2
 
 from .config import settings
 from .events import event_bus, Event, EventType
@@ -225,6 +227,163 @@ async def test_transcript(transcript: str):
         data={"transcript": transcript}
     ))
     return {"message": f"Transcript event triggered: {transcript}"}
+
+
+class DeviceUpdateRequest(BaseModel):
+    device_type: str  # "audio" or "video"
+    device_id: int
+
+
+@app.get("/devices/audio")
+async def get_audio_devices():
+    """Get list of available audio input devices"""
+    try:
+        devices = sd.query_devices()
+        audio_devices = []
+        default_input_device = sd.query_devices(kind='input')['index']
+        
+        for i, device in enumerate(devices):
+            if device['max_input_channels'] > 0:  # Input devices only
+                audio_devices.append({
+                    "id": i,
+                    "name": device['name'],
+                    "channels": device['max_input_channels'],
+                    "sample_rate": device['default_samplerate'],
+                    "is_default": i == default_input_device
+                })
+        
+        # Use system default if no device is explicitly set
+        current_device = settings.audio_device_index if settings.audio_device_index is not None else default_input_device
+        
+        return {
+            "devices": audio_devices,
+            "current_device": current_device
+        }
+    except Exception as e:
+        logger.error(f"Error getting audio devices: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/devices/video")
+async def get_video_devices():
+    """Get list of available video capture devices"""
+    try:
+        import subprocess
+        import re
+        import os
+        
+        # Get actual camera names from system_profiler on macOS
+        def get_camera_names():
+            try:
+                result = subprocess.run(['system_profiler', 'SPCameraDataType'], 
+                                      capture_output=True, text=True, timeout=10)
+                if result.returncode == 0:
+                    # Parse camera names from system_profiler output
+                    camera_names = []
+                    lines = result.stdout.split('\n')
+                    for line in lines:
+                        line = line.strip()
+                        if line.endswith(':') and 'Camera' in line:
+                            # Extract camera name (remove the trailing colon)
+                            name = line[:-1].strip()
+                            if name and name != 'Camera':
+                                camera_names.append(name)
+                    return camera_names
+            except Exception as e:
+                logger.warning(f"Could not get camera names from system_profiler: {e}")
+            return []
+        
+        camera_names = get_camera_names()
+        video_devices = []
+        available_cameras = []
+        
+        # Suppress OpenCV warnings temporarily during camera detection
+        old_log_level = os.environ.get('OPENCV_LOG_LEVEL', '')
+        os.environ['OPENCV_LOG_LEVEL'] = 'ERROR'
+        
+        try:
+            # Test up to 10 camera indices to find available cameras
+            for i in range(10):
+                cap = cv2.VideoCapture(i)
+                if cap is not None and cap.isOpened():
+                    # Try to read a frame to verify the device works
+                    ret, _ = cap.read()
+                    if ret:
+                        available_cameras.append(i)
+                        # Use actual camera name if available, otherwise fallback to generic name
+                        if i < len(camera_names):
+                            device_name = camera_names[i]
+                        else:
+                            device_name = f"Camera {i}"
+                        
+                        video_devices.append({
+                            "id": i,
+                            "name": device_name,
+                            "is_current": i == settings.camera_index
+                        })
+                    cap.release()
+        finally:
+            # Restore original log level
+            if old_log_level:
+                os.environ['OPENCV_LOG_LEVEL'] = old_log_level
+            else:
+                os.environ.pop('OPENCV_LOG_LEVEL', None)
+        
+        # Default to the first available camera (typically the built-in camera)
+        default_camera = available_cameras[0] if available_cameras else 0
+        current_device = settings.camera_index if settings.camera_index in available_cameras else default_camera
+        
+        return {
+            "devices": video_devices,
+            "current_device": current_device
+        }
+    except Exception as e:
+        logger.error(f"Error getting video devices: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/devices/update")
+async def update_device(request: DeviceUpdateRequest):
+    """Update the selected audio or video device"""
+    try:
+        if request.device_type == "audio":
+            # Update audio device
+            settings.audio_device_index = request.device_id
+            
+            # Restart audio processor with new device
+            if container.audio_processor.is_listening:
+                await container.audio_processor.stop_listening()
+                await container.audio_processor.start_listening()
+            
+            await event_bus.publish(Event(
+                type=EventType.SYSTEM_STATUS,
+                action="audio_device_changed",
+                data={"device_id": request.device_id, "message": f"Audio device changed to device {request.device_id}"}
+            ))
+            
+        elif request.device_type == "video":
+            # Update video device
+            settings.camera_index = request.device_id
+            
+            # Restart vision processor with new device
+            if container.vision_processor.is_capturing:
+                await container.vision_processor.stop_capture()
+                await container.vision_processor.start_capture()
+            
+            await event_bus.publish(Event(
+                type=EventType.SYSTEM_STATUS,
+                action="video_device_changed",
+                data={"device_id": request.device_id, "message": f"Video device changed to device {request.device_id}"}
+            ))
+            
+        else:
+            raise HTTPException(status_code=400, detail="Invalid device_type. Must be 'audio' or 'video'")
+        
+        return {"message": f"{request.device_type.title()} device updated successfully", "device_id": request.device_id}
+        
+    except Exception as e:
+        logger.error(f"Error updating device: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":
