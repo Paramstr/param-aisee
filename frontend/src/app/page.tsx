@@ -4,9 +4,10 @@ import { useSocket } from '@/lib/useSocket';
 import { CameraFeed } from '@/components/CameraFeed';
 import { ChatPanel } from '@/components/ChatPanel';
 import { StatusBar } from '@/components/StatusBar';
+import { ToolIndicator } from '@/components/ToolIndicator';
 
 export default function Home() {
-  const { isConnected, lastEvent, systemStatus, error } = useSocket('ws://localhost:8000/ws');
+  const { isConnected, lastEvent, systemStatus, toolState, error } = useSocket('ws://localhost:8000/ws');
 
   return (
     <div className="min-h-screen bg-gray-950 p-4">
@@ -34,8 +35,13 @@ export default function Home() {
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-140px)]">
         {/* Camera Feed - Takes up 2 columns on large screens */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 relative">
           <CameraFeed className="h-full min-h-[400px]" />
+          
+          {/* Tool indicator overlay */}
+          <div className="absolute top-4 left-4 z-10">
+            <ToolIndicator toolState={toolState} />
+          </div>
         </div>
 
         {/* Right Panel - Chat and Status with proper flex layout */}

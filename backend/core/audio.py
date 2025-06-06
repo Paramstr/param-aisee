@@ -254,6 +254,16 @@ class AudioProcessor:
         except Exception as e:
             logger.error(f"VAD processing error: {e}")
 
+        # ---- New check for context finalization due to silence ----
+        # This check runs after each VAD frame processing attempt.
+        # It relies on self.last_speech_time being updated by _handle_transcript.
+        if self.context_mode and self.context_buffer: # Only finalize if in context mode and buffer has content
+            current_frame_time = time.time()
+            if (current_frame_time - self.last_speech_time) > self.silence_threshold:
+                logger.info(f"Context silence timer ({self.silence_threshold}s) expired in _process_vad_frame. Finalizing context.")
+                await self._finalize_context()
+                # _finalize_context will reset self.context_mode, preventing re-triggering if _process_vad_frame is called again quickly.
+
     async def _process_speech_segment(self):
         """Process accumulated speech segment"""
         if not self.speech_frames or len(self.speech_frames) < self.min_speech_duration_frames * self.frame_size:
@@ -381,9 +391,9 @@ class AudioProcessor:
             
         # Check if we should end context accumulation (silence timeout)
         # This check should only happen if context mode is still active (i.e., "enter" wasn't said)
-        if self.context_mode and (current_time - self.last_speech_time) > self.silence_threshold:
-            logger.info(f"Silence threshold reached. Finalizing context.")
-            await self._finalize_context()
+        # if self.context_mode and (current_time - self.last_speech_time) > self.silence_threshold:
+        #    logger.info(f"Silence threshold reached. Finalizing context.")
+        #    await self._finalize_context()
 
     async def _finalize_context(self):
         """Finalize accumulated context and send to LLM"""

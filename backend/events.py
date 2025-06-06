@@ -7,12 +7,13 @@ from enum import Enum
 
 class EventType(Enum):
     # Core system events
-    SYSTEM_STATUS = "system_status"        # Replaces STATUS_UPDATE, WHISPER_MODEL_*, etc.
-    AUDIO_EVENT = "audio_event"            # Replaces WAKE_WORD_DETECTED, TRANSCRIPT_READY, WHISPER_*
-    LLM_EVENT = "llm_event"               # Replaces LLM_RESPONSE_START, LLM_RESPONSE_CHUNK, LLM_RESPONSE_END
-    VISION_EVENT = "vision_event"          # Replaces FRAME_CAPTURED
-    TTS_EVENT = "tts_event"               # Replaces TTS_START, TTS_END
-    ERROR = "error"                        # Keep as is
+    SYSTEM_STATUS = "system_status"        
+    AUDIO_EVENT = "audio_event"            
+    LLM_EVENT = "llm_event"               
+    VISION_EVENT = "vision_event"          
+    TTS_EVENT = "tts_event"               
+    TOOL_EVENT = "tool_event"             # Tool execution events
+    ERROR = "error"                       
 
 
 @dataclass

@@ -47,6 +47,8 @@ class DependencyContainer:
         self.shared = SharedResources()
         self._audio_processor = None
         self._vision_processor = None
+        self._video_recorder = None
+        self._tool_registry = None
         self._llm_processor = None
         self._task_manager = None
     
@@ -57,6 +59,8 @@ class DependencyContainer:
         # Import here to avoid circular imports
         from .audio import AudioProcessor
         from .vision import VisionProcessor
+        from .video_capture import VideoRecorder
+        from .tools import ToolRegistry
         from .llm import LLMProcessor
         from .tasks import TaskManager
         
@@ -68,14 +72,26 @@ class DependencyContainer:
         
         self._vision_processor = VisionProcessor()
         
+        # Video recorder depends on vision processor
+        self._video_recorder = VideoRecorder(self._vision_processor)
+        
+        # Tool registry depends on vision processor and video recorder
+        self._tool_registry = ToolRegistry(
+            vision_processor=self._vision_processor,
+            video_recorder=self._video_recorder
+        )
+        
+        # LLM processor now includes tool registry
         self._llm_processor = LLMProcessor(
-            io_pool=self.shared.io_pool
+            io_pool=self.shared.io_pool,
+            tool_registry=self._tool_registry
         )
         
         self._task_manager = TaskManager(
             audio_processor=self._audio_processor,
             vision_processor=self._vision_processor,
-            llm_processor=self._llm_processor
+            llm_processor=self._llm_processor,
+            tool_registry=self._tool_registry
         )
         
         # Initialize processors
@@ -95,6 +111,14 @@ class DependencyContainer:
     @property
     def vision_processor(self):
         return self._vision_processor
+    
+    @property
+    def video_recorder(self):
+        return self._video_recorder
+    
+    @property
+    def tool_registry(self):
+        return self._tool_registry
     
     @property
     def llm_processor(self):

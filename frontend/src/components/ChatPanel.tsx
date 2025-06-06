@@ -3,11 +3,14 @@ import { Event } from '@/lib/useSocket';
 
 interface Message {
   id: string;
-  type: 'user' | 'assistant';
+  type: 'user' | 'assistant' | 'tool';
   content: string;
   timestamp: Date;
   isComplete: boolean;
   imageBase64?: string;
+  videoBase64?: string;
+  duration?: number;
+  toolName?: string;
 }
 
 interface RawTranscript {
@@ -36,6 +39,8 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
   const [showDebugPanel, setShowDebugPanel] = useState(true);
   const [isImagePopupOpen, setIsImagePopupOpen] = useState(false);
   const [popupImageUrl, setPopupImageUrl] = useState<string | null>(null);
+  const [isVideoPopupOpen, setIsVideoPopupOpen] = useState(false);
+  const [popupVideoData, setPopupVideoData] = useState<{url: string; duration?: number} | null>(null);
   
   // Use refs for state that doesn't need re-renders or is derived
   const isProcessing = useRef(false);
@@ -299,37 +304,7 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
           case 'response_start':
             setCurrentResponse('');
             isProcessing.current = true;
-
-            const eventDataForResponseStart = lastEvent.data;
-            if (eventDataForResponseStart?.imageBase64) {
-              setCurrentResponseImageBase64(eventDataForResponseStart.imageBase64);
-
-              // Attempt to update the last user message with this image
-              setMessages(prevMessages => {
-                if (prevMessages.length === 0) return prevMessages;
-                const lastMessageIndex = prevMessages.length - 1;
-                const lastMessage = prevMessages[lastMessageIndex];
-
-                if (
-                  lastMessage.type === 'user' &&
-                  !lastMessage.imageBase64 &&
-                  eventDataForResponseStart.transcript &&
-                  lastMessage.content === eventDataForResponseStart.transcript
-                ) {
-                  const updatedMessages = [...prevMessages];
-                  updatedMessages[lastMessageIndex] = {
-                    ...lastMessage,
-                    imageBase64: eventDataForResponseStart.imageBase64 !== null 
-                                   ? eventDataForResponseStart.imageBase64 
-                                   : undefined,
-                  };
-                  return updatedMessages;
-                }
-                return prevMessages;
-              });
-            } else {
-              setCurrentResponseImageBase64(null);
-            }
+            setCurrentResponseImageBase64(null);
             break;
             
           case 'response_chunk':
@@ -358,6 +333,113 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
             break;
         }
         break;
+        
+      case 'tool_event':
+        switch (eventAction) {
+          case 'video_start':
+            const duration = lastEvent.data?.duration || 3;
+            const toolMessage: Message = {
+              id: 'video_' + Date.now().toString(),
+              type: 'assistant',
+              content: `🎥 Recording ${duration}-second video to analyze...`,
+              timestamp: new Date(),
+              isComplete: true
+            };
+            setMessages(prev => [...prev, toolMessage]);
+            break;
+            
+          case 'photo_start':
+            const photoMessage: Message = {
+              id: 'photo_' + Date.now().toString() + '_' + Math.random().toString(36).substr(2, 9),
+              type: 'assistant',
+              content: `📸 Capturing photo for analysis...`,
+              timestamp: new Date(),
+              isComplete: true
+            };
+            console.log('📸 Photo start - creating message:', photoMessage);
+            setMessages(prev => [...prev, photoMessage]);
+            break;
+            
+          case 'photo_complete':
+            const capturedPhotoData = lastEvent.data;
+            console.log('📸 Photo complete event received:', capturedPhotoData);
+            
+            if (capturedPhotoData?.success) {
+              console.log('📸 Photo success, updating messages');
+              
+              // Update the photo_start message with success indicator
+              setMessages(prev => {
+                const updated = prev.map(msg => {
+                  if (msg.id.startsWith('photo_') && msg.content.includes('Capturing photo for analysis')) {
+                    console.log('📸 Updating message:', msg.id, msg.content);
+                    return { ...msg, content: `✅ Photo captured successfully` };
+                  }
+                  return msg;
+                });
+                console.log('📸 Messages after update:', updated);
+                return updated;
+              });
+              
+              // Add the captured photo as a tool message
+              if (capturedPhotoData.photo_base64) {
+                console.log('📸 Adding photo tool message');
+                const photoToolMessage: Message = {
+                  id: Date.now().toString(),
+                  type: 'tool',
+                  content: 'Photo captured',
+                  timestamp: new Date(),
+                  isComplete: true,
+                  imageBase64: capturedPhotoData.photo_base64,
+                  toolName: 'get_photo'
+                };
+                setMessages(prev => [...prev, photoToolMessage]);
+              }
+            } else {
+              console.log('📸 Photo failed, updating with error');
+              // Update with error indicator
+              setMessages(prev => prev.map(msg => 
+                msg.id.startsWith('photo_') && msg.content.includes('Capturing photo for analysis')
+                  ? { ...msg, content: `❌ Photo capture failed` }
+                  : msg
+              ));
+            }
+            break;
+            
+          case 'video_complete':
+            const videoData = lastEvent.data;
+            if (videoData?.success) {
+              // Update the video_start message with success indicator
+              setMessages(prev => prev.map(msg => 
+                msg.id.startsWith('video_') && msg.content.includes('Recording') && msg.content.includes('video to analyze')
+                  ? { ...msg, content: `✅ Video recorded successfully (${videoData.duration}s)` }
+                  : msg
+              ));
+              
+              // Add the captured video as a tool message
+              if (videoData.video_base64) {
+                const videoMessage: Message = {
+                  id: Date.now().toString(),
+                  type: 'tool',
+                  content: `Video captured (${videoData.duration}s, ${videoData.frames_recorded} frames)`,
+                  timestamp: new Date(),
+                  isComplete: true,
+                  videoBase64: videoData.video_base64,
+                  duration: videoData.duration,
+                  toolName: 'get_video'
+                };
+                setMessages(prev => [...prev, videoMessage]);
+              }
+            } else {
+              // Update with error indicator
+              setMessages(prev => prev.map(msg => 
+                msg.id.startsWith('video_') && msg.content.includes('Recording') && msg.content.includes('video to analyze')
+                  ? { ...msg, content: `❌ Video recording failed` }
+                  : msg
+              ));
+            }
+            break;
+        }
+        break;
     }
   }, [lastEvent]);
   
@@ -378,8 +460,19 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
     setPopupImageUrl(null);
   };
   
+  // Video popup handlers
+  const openVideoPopup = (videoUrl: string, duration?: number) => {
+    setPopupVideoData({ url: videoUrl, duration });
+    setIsVideoPopupOpen(true);
+  };
+
+  const closeVideoPopup = () => {
+    setIsVideoPopupOpen(false);
+    setPopupVideoData(null);
+  };
+  
   return (
-    <div className={`bg-gray-900 rounded-lg p-4 flex flex-col h-full ${className}`}>
+    <div className={`bg-gray-900 rounded-lg p-4 flex flex-col max-h-full ${className}`}>
       <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-700 flex-shrink-0">
         <div className="flex items-center">
           <div className="text-xl mr-2">💬</div>
@@ -419,7 +512,7 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
             )}
           </div>
           
-          <div className="h-40 overflow-y-auto space-y-1 text-xs">
+          <div className="h-32 overflow-y-auto space-y-1 text-xs">
             {rawTranscripts.length === 0 && (
               <div className="text-gray-500 text-center py-2">
                 Listening for speech...
@@ -484,10 +577,10 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
         </div>
       )}
       
-      {/* Main Conversation - Now takes up remaining space */}
+      {/* Main Conversation - Scrollable with fixed height */}
       <div 
         ref={conversationRef}
-        className="flex-1 overflow-y-auto space-y-3 min-h-0 pr-1"
+        className="flex-1 overflow-y-auto space-y-3 min-h-0 pr-1 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800"
         style={{ scrollBehavior: 'smooth' }}
       >
         {messages.length === 0 && !isProcessing.current && !isInContextMode.current && (
@@ -512,6 +605,8 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
               className={`max-w-[80%] rounded-lg px-3 py-2 group relative ${
                 message.type === 'user'
                   ? 'bg-blue-600 text-white'
+                  : message.type === 'tool'
+                  ? 'bg-purple-600 text-white border-l-4 border-purple-400'
                   : 'bg-gray-700 text-gray-100'
               }`}
             >
@@ -543,36 +638,89 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
               ) : (
                 <>
                   <div className="mb-1">
-                    {message.type === 'user' && message.imageBase64 ? (
-                      <div className="flex items-start space-x-2">
-                        <img
-                          src={`data:image/jpeg;base64,${message.imageBase64}`}
-                          alt="User context"
-                          className="rounded-md max-w-[80px] max-h-[80px] cursor-pointer hover:opacity-80 transition-opacity"
-                          onClick={() => openImagePopup(`data:image/jpeg;base64,${message.imageBase64}`)}
-                        />
-                        <div className="text-sm flex-1">{message.content}</div>
-                      </div>
-                    ) : (
-                      <div className="text-sm">
-                        {message.content}
+                    {/* Tool message with media */}
+                    {message.type === 'tool' && (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                          <span>{message.toolName === 'get_video' ? '🎥' : '📸'}</span>
+                          <span>{message.content}</span>
+                        </div>
+                        
+                        {/* Display captured video */}
+                        {message.videoBase64 && (
+                          <div className="mt-2">
+                            <video
+                              controls
+                              className="rounded-lg max-w-full max-h-[200px] bg-black cursor-pointer"
+                              preload="metadata"
+                              onClick={() => openVideoPopup(`data:video/mp4;base64,${message.videoBase64}`, message.duration)}
+                            >
+                              <source 
+                                src={`data:video/mp4;base64,${message.videoBase64}`} 
+                                type="video/mp4" 
+                              />
+                              Your browser does not support video playback.
+                            </video>
+                            <div className="text-xs text-purple-200 mt-1">
+                              Duration: {message.duration}s • Click to enlarge
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Display captured photo */}
+                        {message.imageBase64 && (
+                          <div className="mt-2">
+                            <img
+                              src={`data:image/jpeg;base64,${message.imageBase64}`}
+                              alt="Captured photo"
+                              className="rounded-lg max-w-[200px] max-h-[200px] cursor-pointer hover:opacity-80 transition-opacity"
+                              onClick={() => openImagePopup(`data:image/jpeg;base64,${message.imageBase64}`)}
+                            />
+                            <div className="text-xs text-purple-200 mt-1">
+                              Click to enlarge
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
+                    
+                    {/* Regular user/assistant messages */}
+                    {message.type !== 'tool' && (
+                      <>
+                        {message.type === 'user' && message.imageBase64 ? (
+                          <div className="flex items-start space-x-2">
+                            <img
+                              src={`data:image/jpeg;base64,${message.imageBase64}`}
+                              alt="User context"
+                              className="rounded-md max-w-[80px] max-h-[80px] cursor-pointer hover:opacity-80 transition-opacity"
+                              onClick={() => openImagePopup(`data:image/jpeg;base64,${message.imageBase64}`)}
+                            />
+                            <div className="text-sm flex-1">{message.content}</div>
+                          </div>
+                        ) : (
+                          <div className="text-sm">
+                            {message.content}
+                          </div>
+                        )}
 
-                    {message.type === 'assistant' && message.imageBase64 && (
-                      <img
-                        src={`data:image/jpeg;base64,${message.imageBase64}`}
-                        alt="Assistant context"
-                        className="mt-2 rounded-md max-w-[150px] max-h-[150px] cursor-pointer hover:opacity-80 transition-opacity"
-                        onClick={() => openImagePopup(`data:image/jpeg;base64,${message.imageBase64}`)}
-                      />
+                        {message.type === 'assistant' && message.imageBase64 && (
+                          <img
+                            src={`data:image/jpeg;base64,${message.imageBase64}`}
+                            alt="Assistant context"
+                            className="mt-2 rounded-md max-w-[150px] max-h-[150px] cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={() => openImagePopup(`data:image/jpeg;base64,${message.imageBase64}`)}
+                          />
+                        )}
+                      </>
                     )}
                   </div>
 
                   <div className="flex items-center justify-between">
                     <div
                       className={`text-xs opacity-70 ${
-                        message.type === 'user' ? 'text-blue-200' : 'text-gray-400'
+                        message.type === 'user' ? 'text-blue-200' : 
+                        message.type === 'tool' ? 'text-purple-200' :
+                        'text-gray-400'
                       }`}
                     >
                       {formatTime(message.timestamp)}
@@ -667,6 +815,40 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
               alt="Enlarged view" 
               className="max-w-[90vw] max-h-[90vh] object-contain rounded" 
             />
+          </div>
+        </div>
+      )}
+
+      {/* Video Popup Modal */}
+      {isVideoPopupOpen && popupVideoData && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+          onClick={closeVideoPopup}
+        >
+          <div 
+            className="bg-gray-900 p-4 rounded-lg shadow-xl relative max-w-full max-h-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={closeVideoPopup}
+              className="absolute top-3 right-3 text-white bg-gray-700 hover:bg-gray-600 rounded-full p-1 text-2xl leading-none z-10"
+              aria-label="Close video viewer"
+            >
+              &times;
+            </button>
+            <video
+              controls
+              autoPlay
+              className="max-w-[90vw] max-h-[90vh] rounded"
+            >
+              <source src={popupVideoData.url} type="video/mp4" />
+              Your browser does not support video playback.
+            </video>
+            {popupVideoData.duration && (
+              <div className="text-white text-center mt-2 text-sm">
+                Duration: {popupVideoData.duration}s
+              </div>
+            )}
           </div>
         </div>
       )}

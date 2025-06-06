@@ -8,11 +8,12 @@ logger = logging.getLogger(__name__)
 
 
 class TaskManager:
-    def __init__(self, audio_processor, vision_processor, llm_processor):
+    def __init__(self, audio_processor, vision_processor, llm_processor, tool_registry=None):
         # Dependency injection - no more global imports
         self.audio_processor = audio_processor
         self.vision_processor = vision_processor
         self.llm_processor = llm_processor
+        self.tool_registry = tool_registry
         
         self.is_running = False
         self.event_handler_task: Optional[asyncio.Task] = None
@@ -41,6 +42,17 @@ class TaskManager:
             EventType.TTS_EVENT: {
                 "start": self._handle_tts_start,
                 "end": self._handle_tts_end,
+            },
+            EventType.TOOL_EVENT: {
+                "tool_start": self._handle_tool_start,
+                "tool_complete": self._handle_tool_complete,
+                "tool_error": self._handle_tool_error,
+                "photo_start": self._handle_photo_start,
+                "photo_complete": self._handle_photo_complete,
+                "video_start": self._handle_video_start,
+                "video_complete": self._handle_video_complete,
+                "recording_start": self._handle_recording_start,
+                "recording_complete": self._handle_recording_complete,
             },
             EventType.ERROR: {
                 "*": self._handle_error,  # Handle all error actions
@@ -234,6 +246,60 @@ class TaskManager:
     async def _handle_tts_end(self, event: Event):
         """Handle TTS end"""
         logger.info("🔇 TTS completed")
+    
+    # Tool event handlers
+    async def _handle_tool_start(self, event: Event):
+        """Handle tool start"""
+        tool_name = event.data.get("tool", "unknown")
+        args = event.data.get("args", {})
+        logger.info(f"🔧 Starting tool: {tool_name} with args: {args}")
+    
+    async def _handle_tool_complete(self, event: Event):
+        """Handle tool complete"""
+        tool_name = event.data.get("tool", "unknown")
+        success = event.data.get("success", False)
+        status = "✅" if success else "❌"
+        logger.info(f"{status} Tool completed: {tool_name}")
+    
+    async def _handle_tool_error(self, event: Event):
+        """Handle tool error"""
+        tool_name = event.data.get("tool", "unknown")
+        error_msg = event.data.get("error", "Unknown error")
+        logger.error(f"❌ Tool error [{tool_name}]: {error_msg}")
+    
+    async def _handle_photo_start(self, event: Event):
+        """Handle photo start"""
+        tool_name = event.data.get("tool", "photo")
+        logger.info(f"📸 Capturing photo...")
+    
+    async def _handle_photo_complete(self, event: Event):
+        """Handle photo complete"""
+        success = event.data.get("success", False)
+        status = "✅" if success else "❌"
+        logger.info(f"📸 {status} Photo capture completed")
+    
+    async def _handle_video_start(self, event: Event):
+        """Handle video start"""
+        duration = event.data.get("duration", 3)
+        logger.info(f"🎥 Starting video recording ({duration}s)...")
+    
+    async def _handle_video_complete(self, event: Event):
+        """Handle video complete"""
+        duration = event.data.get("duration", 3)
+        success = event.data.get("success", False)
+        status = "✅" if success else "❌"
+        logger.info(f"🎥 {status} Video recording completed ({duration}s)")
+    
+    async def _handle_recording_start(self, event: Event):
+        """Handle recording start"""
+        duration = event.data.get("duration", 3)
+        logger.debug(f"🎬 Recording frames for {duration}s...")
+    
+    async def _handle_recording_complete(self, event: Event):
+        """Handle recording complete"""
+        duration = event.data.get("duration", 3)
+        file_size = event.data.get("file_size", 0)
+        logger.debug(f"🎬 Recording completed: {duration}s, {file_size} bytes")
     
     # Error handler
     async def _handle_error(self, event: Event):
