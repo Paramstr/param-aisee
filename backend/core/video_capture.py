@@ -16,20 +16,70 @@ from ..events import Event, EventType, event_bus
 logger = logging.getLogger(__name__)
 
 
+def fourcc_to_string(fourcc):
+    """Convert fourcc code back to string for logging"""
+    try:
+        return "".join([chr((fourcc >> 8 * i) & 0xFF) for i in range(4)])
+    except:
+        return str(fourcc)
+
+
 class VideoRecorder:
     """Video recording system for tool use"""
     
     def __init__(self, vision_processor):
         self.vision_processor = vision_processor
         
-        # Video settings - use mp4v codec which works reliably
+        # Video settings - use H.264 codec for web compatibility
         self.fps = 30  # Target FPS for video recording
-        self.fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # MPEG-4 Part 2 - always available
+        self.fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # MPEG-4 Part 2 - fallback
+        
+        # Try H.264 codec for better web browser compatibility
+        # Common H.264 fourcc codes: 'H264', 'avc1', 'X264'
+        h264_fourccs = ['avc1', 'H264', 'X264']  # Order of preference for web compatibility
+        
+        # Test which codec works best on this system
+        self.best_fourcc = self._find_best_codec(h264_fourccs)
         
         # Create recordings directory if it doesn't exist
         self.recordings_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "recordings")
         os.makedirs(self.recordings_dir, exist_ok=True)
         logger.info(f"📁 Video recordings will be saved to: {self.recordings_dir}")
+        logger.info(f"🎬 Using video codec: {self.best_fourcc}")
+    
+    def _find_best_codec(self, h264_fourccs):
+        """Find the best available codec for video recording"""
+        # Test with a small dummy video to see which codec works
+        test_size = (320, 240)
+        test_fps = 10
+        
+        for fourcc_str in h264_fourccs:
+            try:
+                fourcc = cv2.VideoWriter_fourcc(*fourcc_str)
+                # Try to create a test video writer
+                temp_path = "/tmp/test_codec.mp4"
+                test_writer = cv2.VideoWriter(temp_path, fourcc, test_fps, test_size)
+                
+                if test_writer.isOpened():
+                    test_writer.release()
+                    # Clean up test file
+                    try:
+                        os.remove(temp_path)
+                    except:
+                        pass
+                    logger.info(f"✅ Found working H.264 codec: {fourcc_str}")
+                    return fourcc
+                else:
+                    test_writer.release()
+                    logger.debug(f"❌ Codec {fourcc_str} not available")
+                    
+            except Exception as e:
+                logger.debug(f"❌ Codec {fourcc_str} failed: {e}")
+                continue
+        
+        # Fallback to mp4v if no H.264 codec works
+        logger.warning("⚠️ No H.264 codec available, falling back to mp4v (may not play in browsers)")
+        return self.fourcc
         
     async def record_video(self, duration: int) -> Dict[str, Any]:
         """Record a video clip of specified duration"""
@@ -41,7 +91,7 @@ class VideoRecorder:
         
         try:
             # Validate duration
-            duration = max(1, min(10, duration))  # Clamp to 1-10 seconds
+            duration = max(1, min(300, duration))  # Clamp to 1-300 seconds (5 minutes)
             
             await event_bus.publish(Event(
                 type=EventType.TOOL_EVENT,
@@ -114,21 +164,32 @@ class VideoRecorder:
             
             height, width = current_frame.shape[:2]
             
-            # Initialize video writer with mp4v codec
+            # Initialize video writer with best available codec
             video_writer = cv2.VideoWriter(
                 video_path,
-                self.fourcc,
+                self.best_fourcc,
                 self.fps,
                 (width, height)
             )
             
             if not video_writer.isOpened():
-                return {
-                    "success": False,
-                    "error": "Failed to initialize video writer"
-                }
+                # Try fallback to mp4v if preferred codec failed
+                logger.warning(f"Primary codec failed, trying mp4v fallback")
+                video_writer.release()
+                video_writer = cv2.VideoWriter(
+                    video_path,
+                    self.fourcc,  # mp4v fallback
+                    self.fps,
+                    (width, height)
+                )
+                
+                if not video_writer.isOpened():
+                    return {
+                        "success": False,
+                        "error": "Failed to initialize video writer with any codec"
+                    }
             
-            logger.info(f"🎬 Video writer initialized with mp4v/MP4 format")
+            logger.info(f"🎬 Video writer initialized with {fourcc_to_string(self.best_fourcc)}/MP4 format")
             logger.info(f"📁 Saving video to: {video_path}")
             
             # Record video frames - pass dimensions for reference

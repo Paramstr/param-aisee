@@ -9,3 +9,4 @@ opencv-python-headless
 pillow
 python-dotenv
 webrtcvad
+qwen-vl-utils

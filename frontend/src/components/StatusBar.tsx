@@ -68,91 +68,94 @@ export function StatusBar({
   };
   
   return (
-    <div className={`bg-gray-900 rounded-lg p-4 ${className}`}>
-      <div className="flex items-center mb-3 pb-2 border-b border-gray-700">
-        <div className="text-xl mr-2">📊</div>
-        <h2 className="text-lg font-semibold text-white">System Status</h2>
+    <div className={`bg-gray-900 rounded-lg flex flex-col overflow-hidden ${className}`}>
+      <div className="flex-shrink-0 flex items-center p-3 sm:p-4 pb-2 border-b border-gray-700">
+        <div className="text-lg sm:text-xl mr-2">📊</div>
+        <h2 className="text-sm sm:text-lg font-semibold text-white">System Status</h2>
       </div>
       
-      {/* Connection Status */}
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <div className="space-y-2">
-          <h3 className="text-sm font-medium text-gray-300">Connection</h3>
-          <div className="flex items-center space-x-2">
-            <span className={getStatusColor(isConnected)}>
-              {getStatusIcon(isConnected)}
-            </span>
-            <span className="text-sm text-gray-300">
-              {isConnected ? 'Connected' : 'Disconnected'}
-            </span>
+      <div className="flex-1 overflow-y-auto p-3 sm:p-4 pt-3 space-y-3 sm:space-y-4 min-h-0">
+      
+        {/* Connection Status */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+          <div className="space-y-2">
+            <h3 className="text-xs sm:text-sm font-medium text-gray-300">Connection</h3>
+            <div className="flex items-center space-x-2">
+              <span className={getStatusColor(isConnected)}>
+                {getStatusIcon(isConnected)}
+              </span>
+              <span className="text-xs sm:text-sm text-gray-300">
+                {isConnected ? 'Connected' : 'Disconnected'}
+              </span>
+            </div>
+            {error && (
+              <div className="text-xs text-red-400 break-words">
+                {error}
+              </div>
+            )}
           </div>
-          {error && (
-            <div className="text-xs text-red-400">
-              {error}
+          
+          <div className="space-y-2">
+            <h3 className="text-xs sm:text-sm font-medium text-gray-300">System</h3>
+            <div className="flex items-center space-x-2">
+              <span className={getStatusColor(systemStatus?.is_running || false)}>
+                {getStatusIcon(systemStatus?.is_running || false)}
+              </span>
+              <span className="text-xs sm:text-sm text-gray-300">
+                {systemStatus?.is_running ? 'Running' : 'Stopped'}
+              </span>
+            </div>
+          </div>
+        </div>
+      
+        {/* Component Status */}
+        {systemStatus && (
+          <div className="space-y-2">
+            <h3 className="text-xs sm:text-sm font-medium text-gray-300">Components</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              <div className="flex items-center space-x-2">
+                <span className={getStatusColor(systemStatus.audio_listening)}>
+                  {getStatusIcon(systemStatus.audio_listening)}
+                </span>
+                <span className="text-gray-400 truncate">Audio Listening</span>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <span className={getStatusColor(systemStatus.vision_capturing)}>
+                  {getStatusIcon(systemStatus.vision_capturing)}
+                </span>
+                <span className="text-gray-400 truncate">Camera Capture</span>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <span className={getStatusColor(systemStatus.llm_processing)}>
+                  {getStatusIcon(systemStatus.llm_processing)}
+                </span>
+                <span className="text-gray-400 truncate">AI Processing</span>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <span className={getStatusColor(systemStatus.whisper_loaded)}>
+                  {getStatusIcon(systemStatus.whisper_loaded)}
+                </span>
+                <span className="text-gray-400 truncate">Whisper Model</span>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Last Event */}
+        <div className="space-y-2">
+          <h3 className="text-xs sm:text-sm font-medium text-gray-300">Latest Activity</h3>
+          <div className="text-xs text-gray-400 break-words">
+            {getLastEventDisplay()}
+          </div>
+          {lastEvent && (
+            <div className="text-xs text-gray-500">
+              {new Date(lastEvent.timestamp).toLocaleTimeString()}
             </div>
           )}
         </div>
-        
-        <div className="space-y-2">
-          <h3 className="text-sm font-medium text-gray-300">System</h3>
-          <div className="flex items-center space-x-2">
-            <span className={getStatusColor(systemStatus?.is_running || false)}>
-              {getStatusIcon(systemStatus?.is_running || false)}
-            </span>
-            <span className="text-sm text-gray-300">
-              {systemStatus?.is_running ? 'Running' : 'Stopped'}
-            </span>
-          </div>
-        </div>
-      </div>
-      
-      {/* Component Status */}
-      {systemStatus && (
-        <div className="space-y-2 mb-4">
-          <h3 className="text-sm font-medium text-gray-300">Components</h3>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="flex items-center space-x-2">
-              <span className={getStatusColor(systemStatus.audio_listening)}>
-                {getStatusIcon(systemStatus.audio_listening)}
-              </span>
-              <span className="text-gray-400">Audio Listening</span>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <span className={getStatusColor(systemStatus.vision_capturing)}>
-                {getStatusIcon(systemStatus.vision_capturing)}
-              </span>
-              <span className="text-gray-400">Camera Capture</span>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <span className={getStatusColor(systemStatus.llm_processing)}>
-                {getStatusIcon(systemStatus.llm_processing)}
-              </span>
-              <span className="text-gray-400">AI Processing</span>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <span className={getStatusColor(systemStatus.whisper_loaded)}>
-                {getStatusIcon(systemStatus.whisper_loaded)}
-              </span>
-              <span className="text-gray-400">Whisper Model</span>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Last Event */}
-      <div className="space-y-2">
-        <h3 className="text-sm font-medium text-gray-300">Latest Activity</h3>
-        <div className="text-xs text-gray-400">
-          {getLastEventDisplay()}
-        </div>
-        {lastEvent && (
-          <div className="text-xs text-gray-500">
-            {new Date(lastEvent.timestamp).toLocaleTimeString()}
-          </div>
-        )}
       </div>
     </div>
   );

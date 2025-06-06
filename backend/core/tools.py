@@ -114,7 +114,7 @@ class VideoTool(Tool):
         """Capture a video clip"""
         try:
             # Validate duration
-            duration = max(1, min(10, int(duration)))  # Clamp between 1-10 seconds
+            duration = max(1, min(300, int(duration)))  # Clamp between 1-300 seconds (5 minutes)
             
             await event_bus.publish(Event(
                 type=EventType.TOOL_EVENT,
@@ -147,8 +147,10 @@ class VideoTool(Tool):
             return {
                 "success": True,
                 "video_base64": video_result.get("video_base64"),
+                "file_path": video_result.get("file_path"),
                 "duration": duration,
-                "message": f"Video recorded successfully ({duration}s)"
+                "frames_recorded": video_result.get("frames_recorded"),
+                "message": f"Video recorded successfully ({duration}s, {video_result.get('frames_recorded', 0)} frames)"
             }
             
         except Exception as e:
