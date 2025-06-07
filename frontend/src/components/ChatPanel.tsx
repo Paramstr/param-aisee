@@ -372,17 +372,20 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
   const statusInfo = getStatusInfo();
   
   return (
-    <div className={`bg-gray-900 rounded-lg flex flex-col h-full overflow-hidden ${className}`}>
+    <div className={`elevated-card rounded-xl flex flex-col h-full overflow-hidden  ${className}`}>
       {/* Header */}
-      <div className="flex-shrink-0 p-4 pb-3 border-b border-gray-700">
+      <div className="flex-shrink-0 px-4 py-3 border-b border-gray-800">
         <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <div className="text-xl mr-2">💬</div>
-            <h2 className="text-lg font-semibold text-white">Conversation</h2>
+          <div className="flex items-center space-x-2">
+            <div className="w-6 h-6 bg-gradient-to-br from-purple-600 to-purple-700 rounded-lg flex items-center justify-center text-xs shadow-lg">
+              💬
+            </div>
+            <h2 className="text-base font-semibold text-white">Conversation</h2>
             {isInContextMode.current && (
-              <div className="ml-3 flex items-center text-yellow-400">
-                <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse mr-1"></div>
-                <span className="text-xs">Listening...</span>
+              <div className="flex items-center">
+                <div className="status-indicator warning ml-2">
+                  <span className="text-xs font-medium">Listening...</span>
+                </div>
               </div>
             )}
           </div>
@@ -391,33 +394,35 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
       
       {/* Context Accumulation Display */}
       {isInContextMode.current && currentContext.current && (
-        <div className="flex-shrink-0 mx-4 mt-3 p-3 bg-yellow-900/20 border border-yellow-400/30 rounded-lg">
+        <div className="flex-shrink-0 mx-4 mt-3 p-3 bg-yellow-900/20 border border-yellow-700/50 rounded-xl backdrop-blur-sm">
           <div className="flex items-center mb-2">
-            <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse mr-2"></div>
-            <span className="text-sm text-yellow-300 font-medium">Building Context</span>
+            <div className="status-indicator warning">
+              <span className="text-sm font-medium text-yellow-300">Building Context</span>
+            </div>
           </div>
-          <div className="text-sm text-yellow-100 bg-yellow-900/30 p-2 rounded break-words">
+          <div className="text-sm text-yellow-100 bg-yellow-900/30 border border-yellow-800/30 p-2 rounded-lg font-mono leading-relaxed">
             {currentContext.current}
           </div>
-          <div className="text-xs text-yellow-400 mt-1">
+          <div className="text-xs text-yellow-400 mt-1 font-medium">
             Continue speaking or wait 2 seconds to send to AI
           </div>
         </div>
       )}
       
-      {/* Messages Container - This is the key fix for layout issues */}
+      {/* Messages Container */}
       <div className="flex-1 overflow-hidden flex flex-col min-h-0">
         <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3">
           {messages.length === 0 && !isProcessing.current && !isInContextMode.current && (
-            <div className="text-gray-400 text-center py-8">
-              <div className="text-4xl mb-2">🎤</div>
-              <p>Say &quot;Osmo&quot; to start a conversation</p>
-              <p className="text-sm mt-2 text-gray-500">
-                Context will accumulate until 2 seconds of silence
-              </p>
-              <p className="text-xs mt-3 text-gray-600">
-                You can also type messages below ↓
-              </p>
+            <div className="text-center py-8 px-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-gray-700 to-gray-800 rounded-2xl flex items-center justify-center text-xl mx-auto mb-3 shadow-lg">
+                🎤
+              </div>
+              <h3 className="text-base font-semibold text-gray-300 mb-2">Ready to Listen</h3>
+              <p className="text-gray-400 mb-2 text-sm">Say "Osmo" to start a conversation</p>
+              <div className="space-y-1 text-xs text-gray-500">
+                <p>Context will accumulate until 2 seconds of silence</p>
+                <p>You can also type messages below ↓</p>
+              </div>
             </div>
           )}
           
@@ -437,20 +442,23 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
           
           {/* Current streaming response */}
           {isProcessing.current && (
-            <div className="flex justify-start">
-              <div className="max-w-[85%] bg-gray-700 text-gray-100 rounded-lg px-3 py-2">
-                <div className="text-sm mb-1 break-words">
+            <div className="flex justify-start fade-in">
+              <div className="max-w-[85%] bg-gray-800/80 border border-gray-700/50 text-gray-100 rounded-xl px-3 py-2 shadow-lg backdrop-blur-sm">
+                <div className="text-sm mb-1 break-words leading-relaxed">
                   {currentResponse}
                   {currentResponseImageBase64 && (
                     <img
                       src={`data:image/jpeg;base64,${currentResponseImageBase64}`}
                       alt="Current context"
-                      className="mt-2 rounded-md max-w-[150px] max-h-[150px] object-cover"
+                      className="mt-2 rounded-lg max-w-[120px] max-h-[120px] object-cover shadow-md border border-gray-600/50"
                     />
                   )}
                 </div>
-                <div className="text-xs text-gray-400 opacity-70">
-                  {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                <div className="flex items-center space-x-1">
+                  <div className="w-1 h-1 bg-cyan-400 rounded-full animate-pulse"></div>
+                  <span className="text-xs text-gray-400 font-medium">
+                    {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </span>
                 </div>
               </div>
             </div>
@@ -461,7 +469,7 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
       </div>
       
       {/* Input Section */}
-      <div className="flex-shrink-0 p-4 pt-3 border-t border-gray-700">
+      <div className="flex-shrink-0 p-4 pt-3 border-t border-gray-800">
         <div className="flex space-x-2 mb-3">
           <input
             ref={inputRef}
@@ -471,23 +479,35 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
             onKeyDown={handleInputKeyPress}
             placeholder="Type a message..."
             disabled={isProcessing.current}
-            className="flex-1 bg-gray-800 text-white border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 disabled:opacity-50"
+            className="flex-1 bg-gray-800/50 text-white border border-gray-700/50 rounded-lg px-3 py-2 text-sm placeholder-gray-500 transition-all duration-200 focus:outline-none focus:border-gray-400/50 focus:bg-gray-800/80 disabled:opacity-50 disabled:cursor-not-allowed"
           />
           <button
             onClick={handleSendMessage}
             disabled={!inputMessage.trim() || isProcessing.current}
-            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm transition-colors"
+            className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 shadow-lg hover:shadow-gray-500/25 disabled:shadow-none"
           >
             Send
           </button>
         </div>
         
         {/* Status indicator */}
-        <div className="text-xs text-gray-400 flex items-center">
-          <div className={`w-2 h-2 rounded-full mr-2 ${statusInfo.color} ${
-            isTranscribing.current || isProcessing.current || isInContextMode.current ? 'animate-pulse' : ''
-          }`} />
-          {statusInfo.text}
+        <div className="flex items-center">
+          <div className={`inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium border transition-all duration-200 ${
+            statusInfo.color === 'bg-blue-400' ? 'bg-blue-900/40 text-blue-300 border-blue-800/50' :
+            statusInfo.color === 'bg-yellow-400' ? 'bg-yellow-900/40 text-yellow-300 border-yellow-800/50' :
+            statusInfo.color === 'bg-orange-400' ? 'bg-orange-900/40 text-orange-300 border-orange-800/50' :
+            'bg-green-900/40 text-green-300 border-green-800/50'
+          }`}>
+            <div className={`w-1 h-1 rounded-full mr-1 ${
+              statusInfo.color === 'bg-blue-400' ? 'bg-blue-400' :
+              statusInfo.color === 'bg-yellow-400' ? 'bg-yellow-400' :
+              statusInfo.color === 'bg-orange-400' ? 'bg-orange-400' :
+              'bg-green-400'
+            } ${
+              isTranscribing.current || isProcessing.current || isInContextMode.current ? 'animate-pulse' : ''
+            }`} />
+            {statusInfo.text}
+          </div>
         </div>
       </div>
 

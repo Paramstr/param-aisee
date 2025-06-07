@@ -16,11 +16,13 @@ export function StatusBar({
   className = '' 
 }: StatusBarProps) {
   const getStatusColor = (status: boolean) => {
-    return status ? 'text-green-400' : 'text-red-400';
+    return status ? 'text-green-400' : 'text-gray-500';
   };
   
-  const getStatusIcon = (status: boolean) => {
-    return status ? '●' : '○';
+  const getStatusClasses = (status: boolean) => {
+    return status 
+      ? 'status-indicator success' 
+      : 'status-indicator text-gray-500';
   };
   
   const getLastEventDisplay = () => {
@@ -29,132 +31,158 @@ export function StatusBar({
     // Handle new consolidated event system: type:action
     const eventKey = `${lastEvent.type}:${lastEvent.action}`;
     
-    const eventDisplayMap: Record<string, string> = {
+    const eventDisplayMap: Record<string, { icon: string; text: string; color: string }> = {
       // System status events
-      'system_status:listening': '🎤 Audio listening started',
-      'system_status:camera_active': '📹 Camera activated',
-      'system_status:whisper_loading': '🔄 Loading Whisper model',
-      'system_status:whisper_ready': '✅ Whisper model ready',
-      'system_status:system_ready': '🚀 System ready',
+      'system_status:listening': { icon: '🎤', text: 'Audio listening started', color: 'text-blue-400' },
+      'system_status:camera_active': { icon: '📹', text: 'Camera activated', color: 'text-green-400' },
+      'system_status:whisper_loading': { icon: '⏳', text: 'Loading Whisper model', color: 'text-yellow-400' },
+      'system_status:whisper_ready': { icon: '✅', text: 'Whisper model ready', color: 'text-green-400' },
+      'system_status:system_ready': { icon: '🚀', text: 'System ready', color: 'text-green-400' },
       
       // Audio events
-      'audio_event:transcription_start': '🎯 Starting transcription',
-      'audio_event:transcription_end': '✅ Transcription complete',
-      'audio_event:raw_transcript': '📝 Raw transcript received',
-      'audio_event:wake_word_detected': '🎤 Wake word detected',
-      'audio_event:context_ready': '📋 Context ready for AI',
+      'audio_event:transcription_start': { icon: '🎯', text: 'Starting transcription', color: 'text-blue-400' },
+      'audio_event:transcription_end': { icon: '✅', text: 'Transcription complete', color: 'text-green-400' },
+      'audio_event:raw_transcript': { icon: '📝', text: 'Raw transcript received', color: 'text-gray-400' },
+      'audio_event:wake_word_detected': { icon: '🎤', text: 'Wake word detected', color: 'text-orange-400' },
+      'audio_event:context_ready': { icon: '📋', text: 'Context ready for AI', color: 'text-purple-400' },
       
       // LLM events
-      'llm_event:response_start': '🤖 AI thinking',
-      'llm_event:response_chunk': '💭 AI responding',
-      'llm_event:response_end': '✅ Response complete',
+      'llm_event:response_start': { icon: '🤖', text: 'AI thinking', color: 'text-cyan-400' },
+      'llm_event:response_chunk': { icon: '💭', text: 'AI responding', color: 'text-cyan-400' },
+      'llm_event:response_end': { icon: '✅', text: 'Response complete', color: 'text-green-400' },
       
       // TTS events
-      'tts_event:start': '🔊 Speaking',
-      'tts_event:end': '🔇 Speech complete',
+      'tts_event:start': { icon: '🔊', text: 'Speaking', color: 'text-indigo-400' },
+      'tts_event:end': { icon: '🔇', text: 'Speech complete', color: 'text-gray-400' },
       
       // Vision events
-      'vision_event:frame_captured': '📷 Frame captured',
+      'vision_event:frame_captured': { icon: '📷', text: 'Frame captured', color: 'text-teal-400' },
       
       // Error events
-      'error:camera_init_failed': '❌ Camera initialization failed',
-      'error:whisper_failed': '❌ Whisper model failed',
-      'error:llm_processing_failed': '❌ AI processing failed',
-      'error:tts_failed': '❌ Text-to-speech failed',
-      'error:audio_loop_error': '❌ Audio processing error',
+      'error:camera_init_failed': { icon: '❌', text: 'Camera initialization failed', color: 'text-red-400' },
+      'error:whisper_failed': { icon: '❌', text: 'Whisper model failed', color: 'text-red-400' },
+      'error:llm_processing_failed': { icon: '❌', text: 'AI processing failed', color: 'text-red-400' },
+      'error:tts_failed': { icon: '❌', text: 'Text-to-speech failed', color: 'text-red-400' },
+      'error:audio_loop_error': { icon: '❌', text: 'Audio processing error', color: 'text-red-400' },
     };
     
-    return eventDisplayMap[eventKey] || `Event: ${lastEvent.type}:${lastEvent.action}`;
+    const eventInfo = eventDisplayMap[eventKey];
+    return eventInfo || { icon: '📡', text: `Event: ${lastEvent.type}:${lastEvent.action}`, color: 'text-gray-400' };
   };
   
+  const eventInfo = getLastEventDisplay();
+  
   return (
-    <div className={`bg-gray-900 rounded-lg flex flex-col overflow-hidden ${className}`}>
-      <div className="flex-shrink-0 flex items-center p-3 sm:p-4 pb-2 border-b border-gray-700">
-        <div className="text-lg sm:text-xl mr-2">📊</div>
-        <h2 className="text-sm sm:text-lg font-semibold text-white">System Status</h2>
+    <div className={`elevated-card rounded-xl flex flex-col overflow-hidden ${className}`}>
+      {/* Header */}
+      <div className="flex-shrink-0 px-4 py-3 border-b border-gray-800">
+        <div className="flex items-center space-x-2">
+          <div className="w-6 h-6 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center text-xs shadow-lg">
+            📊
+          </div>
+          <h2 className="text-base font-semibold text-white">System Status</h2>
+        </div>
       </div>
       
-      <div className="flex-1 overflow-y-auto p-3 sm:p-4 pt-3 space-y-3 sm:space-y-4 min-h-0">
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
       
         {/* Connection Status */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          <div className="space-y-2">
-            <h3 className="text-xs sm:text-sm font-medium text-gray-300">Connection</h3>
-            <div className="flex items-center space-x-2">
-              <span className={getStatusColor(isConnected)}>
-                {getStatusIcon(isConnected)}
-              </span>
-              <span className="text-xs sm:text-sm text-gray-300">
-                {isConnected ? 'Connected' : 'Disconnected'}
-              </span>
-            </div>
-            {error && (
-              <div className="text-xs text-red-400 break-words">
-                {error}
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <h3 className="text-xs font-medium text-gray-300 uppercase tracking-wide">Connection</h3>
+              <div className="flex items-center">
+                <div className={getStatusClasses(isConnected)}>
+                  <span className="text-sm font-medium">
+                    {isConnected ? 'Connected' : 'Disconnected'}
+                  </span>
+                </div>
               </div>
-            )}
-          </div>
-          
-          <div className="space-y-2">
-            <h3 className="text-xs sm:text-sm font-medium text-gray-300">System</h3>
-            <div className="flex items-center space-x-2">
-              <span className={getStatusColor(systemStatus?.is_running || false)}>
-                {getStatusIcon(systemStatus?.is_running || false)}
-              </span>
-              <span className="text-xs sm:text-sm text-gray-300">
-                {systemStatus?.is_running ? 'Running' : 'Stopped'}
-              </span>
+              {error && (
+                <div className="mt-2 p-2 bg-red-900/30 border border-red-800/50 rounded-lg">
+                  <p className="text-xs text-red-300 leading-relaxed">
+                    {error}
+                  </p>
+                </div>
+              )}
+            </div>
+            
+            <div className="space-y-2">
+              <h3 className="text-xs font-medium text-gray-300 uppercase tracking-wide">System</h3>
+              <div className="flex items-center">
+                <div className={getStatusClasses(systemStatus?.is_running || false)}>
+                  <span className="text-sm font-medium">
+                    {systemStatus?.is_running ? 'Running' : 'Stopped'}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       
         {/* Component Status */}
         {systemStatus && (
-          <div className="space-y-2">
-            <h3 className="text-xs sm:text-sm font-medium text-gray-300">Components</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-              <div className="flex items-center space-x-2">
-                <span className={getStatusColor(systemStatus.audio_listening)}>
-                  {getStatusIcon(systemStatus.audio_listening)}
-                </span>
-                <span className="text-gray-400 truncate">Audio Listening</span>
+          <div className="space-y-3">
+            <h3 className="text-xs font-medium text-gray-300 uppercase tracking-wide">Components</h3>
+            <div className="grid grid-cols-1 gap-2">
+              <div className="flex items-center justify-between p-2 bg-gray-800/50 rounded-lg border border-gray-700/50">
+                <span className="text-xs text-gray-300 font-medium">Audio Listening</span>
+                <div className={getStatusClasses(systemStatus.audio_listening)}>
+                  <span className="text-xs font-medium">
+                    {systemStatus.audio_listening ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
               </div>
               
-              <div className="flex items-center space-x-2">
-                <span className={getStatusColor(systemStatus.vision_capturing)}>
-                  {getStatusIcon(systemStatus.vision_capturing)}
-                </span>
-                <span className="text-gray-400 truncate">Camera Capture</span>
+              <div className="flex items-center justify-between p-2 bg-gray-800/50 rounded-lg border border-gray-700/50">
+                <span className="text-xs text-gray-300 font-medium">Camera Capture</span>
+                <div className={getStatusClasses(systemStatus.vision_capturing)}>
+                  <span className="text-xs font-medium">
+                    {systemStatus.vision_capturing ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
               </div>
               
-              <div className="flex items-center space-x-2">
-                <span className={getStatusColor(systemStatus.llm_processing)}>
-                  {getStatusIcon(systemStatus.llm_processing)}
-                </span>
-                <span className="text-gray-400 truncate">AI Processing</span>
+              <div className="flex items-center justify-between p-2 bg-gray-800/50 rounded-lg border border-gray-700/50">
+                <span className="text-xs text-gray-300 font-medium">AI Processing</span>
+                <div className={getStatusClasses(systemStatus.llm_processing)}>
+                  <span className="text-xs font-medium">
+                    {systemStatus.llm_processing ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
               </div>
               
-              <div className="flex items-center space-x-2">
-                <span className={getStatusColor(systemStatus.whisper_loaded)}>
-                  {getStatusIcon(systemStatus.whisper_loaded)}
-                </span>
-                <span className="text-gray-400 truncate">Whisper Model</span>
+              <div className="flex items-center justify-between p-2 bg-gray-800/50 rounded-lg border border-gray-700/50">
+                <span className="text-xs text-gray-300 font-medium">Whisper Model</span>
+                <div className={getStatusClasses(systemStatus.whisper_loaded)}>
+                  <span className="text-xs font-medium">
+                    {systemStatus.whisper_loaded ? 'Loaded' : 'Not Loaded'}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
         )}
         
-        {/* Last Event */}
-        <div className="space-y-2">
-          <h3 className="text-xs sm:text-sm font-medium text-gray-300">Latest Activity</h3>
-          <div className="text-xs text-gray-400 break-words">
-            {getLastEventDisplay()}
-          </div>
-          {lastEvent && (
-            <div className="text-xs text-gray-500">
-              {new Date(lastEvent.timestamp).toLocaleTimeString()}
+        {/* Latest Activity */}
+        <div className="space-y-3">
+          <h3 className="text-xs font-medium text-gray-300 uppercase tracking-wide">Latest Activity</h3>
+          <div className="bg-gray-800/50 border border-gray-700/50 rounded-lg p-3">
+            <div className="flex items-start space-x-2">
+              <span className="text-base flex-shrink-0">{eventInfo.icon}</span>
+              <div className="flex-1 min-w-0">
+                <p className={`text-xs font-medium ${eventInfo.color}`}>
+                  {eventInfo.text}
+                </p>
+                {lastEvent && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {new Date(lastEvent.timestamp).toLocaleTimeString()}
+                  </p>
+                )}
+              </div>
             </div>
-          )}
+          </div>
         </div>
       </div>
     </div>

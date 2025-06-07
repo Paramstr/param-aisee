@@ -12,69 +12,106 @@ export default function Home() {
   const { isConnected, lastEvent, systemStatus, toolState, error } = useSocket('ws://localhost:8000/ws');
 
   return (
-    <div className="h-screen bg-gray-950 flex flex-col overflow-hidden">
-      {/* Header - Fixed height */}
-      <header className="flex-shrink-0 p-3 sm:p-4 pb-3">
-        <div className="flex items-center space-x-2 sm:space-x-3">
-          <div className="text-2xl sm:text-3xl">🤖</div>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl sm:text-2xl font-bold text-white truncate">Osmo Assistant</h1>
-            <p className="text-gray-400 text-xs sm:text-sm">Always-listening, always-watching AI</p>
-          </div>
-          <div className="flex-shrink-0 flex items-center space-x-3">
-            {/* Device Selector */}
-            <DeviceSelector />
-            
-            {/* Connection Status */}
-            <div className={`flex items-center space-x-2 px-2 sm:px-3 py-1 rounded-full text-xs ${
-              isConnected ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'
-            }`}>
-              <div className={`w-2 h-2 rounded-full ${
-                isConnected ? 'bg-green-400' : 'bg-red-400'
-              }`} />
-              <span className="hidden sm:inline">{isConnected ? 'Connected' : 'Disconnected'}</span>
-              <span className="sm:hidden">{isConnected ? '✓' : '✗'}</span>
+    <div className="h-screen max-h-screen bg-gradient-to-br from-gray-850 via-gray-950 to-gray-800 flex flex-col overflow-hidden">
+      {/* Header - Compact */}
+      <header className="flex-shrink-0 p-4" style={{ height: 'auto' }}>
+        <div className="max-w-8xl mx-auto">
+          <div className=" rounded-xl p-3 fade-in">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-gray-800 to-gray-700 rounded-lg flex items-center justify-center text-lg shadow-lg">
+                  🤖
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-xl font-bold text-white tracking-tight">Osmo Assistant</h1>
+                  <p className="text-xs text-gray-400 font-medium">Always-listening, always-watching AI</p>
+                </div>
+              </div>
+              
+              {/* Center - Tool Indicator */}
+              <div className="flex-1 flex justify-center">
+                <ToolIndicator toolState={toolState} />
+              </div>
+              
+              <div className="flex items-center space-x-3">
+                {/* Device Selector */}
+                <DeviceSelector />
+                
+                {/* Connection Status */}
+                <div className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                  isConnected 
+                    ? 'bg-green-900/50 text-green-300 border border-green-800/50' 
+                    : 'bg-red-900/50 text-red-300 border border-red-800/50'
+                }`}>
+                  <div className={`w-1.5 h-1.5 rounded-full mr-2 ${
+                    isConnected ? 'bg-green-400 shadow-lg shadow-green-400/50' : 'bg-red-400 shadow-lg shadow-red-400/50'
+                  }`} />
+                  <span>{isConnected ? 'Connected' : 'Disconnected'}</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Main Content - Responsive layout */}
-      <main className="flex-1 flex flex-col lg:flex-row gap-3 sm:gap-4 px-3 sm:px-4 pb-3 sm:pb-4 min-h-0 overflow-hidden">
-        {/* Left Panel - Camera and Status/Debug */}
-        <div className="flex flex-col gap-3 sm:gap-4 lg:w-3/5 xl:w-3/5 min-h-0">
-          {/* Camera Feed - 16:9 aspect ratio scaled down */}
-          <div className="flex-shrink-0 relative w-full max-w-2xl mx-auto" style={{ aspectRatio: '16/9' }}>
-            <CameraFeed className="h-full w-full" />
+      {/* Main Content - Optimized spacing */}
+      <main className="flex-1 min-h-0 overflow-hidden">
+        <div className="h-full max-w-8xl mx-auto px-4 pb-4 flex flex-col">
+          <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0">
             
-            {/* Tool indicator overlay */}
-            <div className="absolute top-2 sm:top-4 left-2 sm:left-4 z-10">
-              <ToolIndicator toolState={toolState} />
-            </div>
-          </div>
-          
-          {/* Status and Debug - More space */}
-          <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 min-h-0">
-            <StatusBar
-              isConnected={isConnected}
-              systemStatus={systemStatus}
-              lastEvent={lastEvent}
-              error={error}
-              className="h-full min-h-[200px]"
-            />
-            <DebugStream
-              lastEvent={lastEvent}
-              className="h-full min-h-[200px]"
-            />
-          </div>
-        </div>
+            {/* Left Panel - Camera and Status */}
+            <div className="lg:col-span-7 flex flex-col gap-4 min-h-0">
+              
+              {/* Camera Feed - Smaller aspect ratio */}
+              <div className="relative flex-shrink-0">
+                <div className="elevated-card rounded-xl overflow-hidden fade-in" style={{ aspectRatio: '16/10', maxHeight: '280px' }}>
+                  <CameraFeed className="h-full w-full object-cover" />
+                  
 
-        {/* Right Panel - Chat Panel with full height */}
-        <div className="flex-1 lg:w-2/5 xl:w-2/5 min-h-0">
-          <ChatPanel 
-            lastEvent={lastEvent} 
-            className="h-full"
-          />
+                  
+                  {/* Status overlay */}
+                  <div className="absolute top-3 left-3 z-10 glass-card rounded-lg px-4 py-1">
+                    <div className="flex items-center justify-between text-xs space-x-2">
+                      <span className="text-gray-300 font-medium">Live Feed</span>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse"></div>
+                        <span className="text-gray-400">Recording</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Status and Debug Grid - Compact height */}
+              <div className="flex-shrink-0 grid grid-cols-1 md:grid-cols-2 gap-4" style={{ height: '240px' }}>
+                <div className="fade-in" style={{ animationDelay: '0.1s' }}>
+                  <StatusBar
+                    isConnected={isConnected}
+                    systemStatus={systemStatus}
+                    lastEvent={lastEvent}
+                    error={error}
+                    className="h-full"
+                  />
+                </div>
+                
+                <div className="fade-in" style={{ animationDelay: '0.2s' }}>
+                  <DebugStream
+                    lastEvent={lastEvent}
+                    className="h-full"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Right Panel - Chat */}
+            <div className="lg:col-span-5 min-h-0 fade-in" style={{ animationDelay: '0.3s' }}>
+              <ChatPanel 
+                lastEvent={lastEvent} 
+                className="h-full"
+              />
+            </div>
+            
+          </div>
         </div>
       </main>
     </div>

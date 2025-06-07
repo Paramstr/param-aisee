@@ -88,15 +88,18 @@ export function CameraFeed({ className = '' }: CameraFeedProps) {
   // Paused state (default)
   if (isPaused) {
     return (
-      <div className={`bg-gray-900 rounded-lg flex items-center justify-center relative ${className}`}>
-        <div className="text-gray-400 text-center">
-          <div className="text-6xl mb-4">📷</div>
-          <p className="mb-4">Camera feed paused</p>
+      <div className={`bg-gray-900/50 backdrop-blur-sm border border-gray-800/50 rounded-xl flex items-center justify-center relative ${className}`}>
+        <div className="text-gray-300 text-center p-8">
+          <div className="w-20 h-20 bg-gradient-to-br from-gray-700 to-gray-800 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-6 shadow-lg">
+            📷
+          </div>
+          <h3 className="text-lg font-semibold text-gray-200 mb-2">Camera Feed</h3>
+          <p className="text-gray-400 mb-6">Camera feed is paused</p>
           <button 
             onClick={toggleFeed}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2 mx-auto"
+            className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 text-white px-6 py-3 rounded-lg text-sm font-medium transition-all duration-200 shadow-lg hover:shadow-green-500/25 flex items-center gap-3 mx-auto"
           >
-            <span>▶️</span>
+            <span className="text-lg">▶️</span>
             Start Camera
           </button>
         </div>
@@ -106,17 +109,17 @@ export function CameraFeed({ className = '' }: CameraFeedProps) {
   
   if (isLoading) {
     return (
-      <div className={`bg-gray-900 rounded-lg flex items-center justify-center relative ${className}`}>
-        <div className="text-gray-400 text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
-          <p>Loading camera feed...</p>
+      <div className={`bg-gray-900/50 backdrop-blur-sm border border-gray-800/50 rounded-xl flex items-center justify-center relative ${className}`}>
+        <div className="text-gray-300 text-center p-8">
+          <div className="w-12 h-12 border-3 border-gray-700 border-t-blue-500 rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-300 font-medium">Loading camera feed...</p>
         </div>
         <button 
           onClick={toggleFeed}
-          className="absolute top-4 right-4 bg-gray-700 hover:bg-gray-600 text-white p-2 rounded-lg transition-colors"
+          className="absolute top-4 right-4 glass-card p-2.5 rounded-lg transition-all duration-200 hover:bg-gray-800/80 text-white"
           title="Stop camera"
         >
-          ⏸️
+          <span className="text-lg">⏸️</span>
         </button>
       </div>
     );
@@ -124,15 +127,18 @@ export function CameraFeed({ className = '' }: CameraFeedProps) {
   
   if (error) {
     return (
-      <div className={`bg-gray-900 rounded-lg flex items-center justify-center relative ${className}`}>
-        <div className="text-red-400 text-center">
-          <div className="text-3xl mb-2">📷</div>
-          <p className="mb-4">{error}</p>
+      <div className={`bg-gray-900/50 backdrop-blur-sm border border-red-800/30 rounded-xl flex items-center justify-center relative ${className}`}>
+        <div className="text-center p-8">
+          <div className="w-16 h-16 bg-gradient-to-br from-red-700 to-red-800 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-6 shadow-lg">
+            📷
+          </div>
+          <h3 className="text-lg font-semibold text-red-300 mb-2">Camera Error</h3>
+          <p className="text-red-400 mb-6">{error}</p>
           <button 
             onClick={toggleFeed}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2 mx-auto"
+            className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white px-6 py-3 rounded-lg text-sm font-medium transition-all duration-200 shadow-lg hover:shadow-blue-500/25 flex items-center gap-3 mx-auto"
           >
-            <span>🔄</span>
+            <span className="text-lg">🔄</span>
             Retry
           </button>
         </div>
@@ -141,7 +147,7 @@ export function CameraFeed({ className = '' }: CameraFeedProps) {
   }
 
   return (
-    <div className={`bg-gray-900 rounded-lg overflow-hidden relative ${className}`}>
+    <div className={`bg-gray-900 rounded-xl overflow-hidden relative ${className}`}>
       {imageUrl && (
         <img
           src={imageUrl}
@@ -152,10 +158,10 @@ export function CameraFeed({ className = '' }: CameraFeedProps) {
       )}
       <button 
         onClick={toggleFeed}
-        className="absolute top-4 right-4 bg-black/50 hover:bg-black/70 text-white p-2 rounded-lg transition-colors backdrop-blur-sm"
+        className="absolute top-4 right-4 glass-card p-2.5 rounded-lg transition-all duration-200 hover:bg-gray-800/80 text-white shadow-lg"
         title="Pause camera"
       >
-        ⏸️
+        <span className="text-lg">⏸️</span>
       </button>
     </div>
   );

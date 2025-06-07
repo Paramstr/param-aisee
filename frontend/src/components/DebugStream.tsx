@@ -95,15 +95,17 @@ export function DebugStream({ lastEvent, className = '' }: DebugStreamProps) {
   
   if (!showDebugPanel) {
     return (
-      <div className={`bg-gray-900 rounded-lg p-3 sm:p-4 h-full flex flex-col justify-center ${className}`}>
+      <div className={`elevated-card rounded-xl p-5 h-full flex flex-col justify-center ${className}`}>
         <div className="flex items-center justify-between">
-          <div className="flex items-center min-w-0 flex-1">
-            <div className="text-lg sm:text-xl mr-2 flex-shrink-0">🔍</div>
-            <h2 className="text-sm sm:text-lg font-semibold text-white truncate">Debug Stream</h2>
+          <div className="flex items-center space-x-3 min-w-0 flex-1">
+            <div className="w-8 h-8 bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-lg flex items-center justify-center text-sm shadow-lg">
+              🔍
+            </div>
+            <h2 className="text-lg font-semibold text-white">Debug Stream</h2>
           </div>
           <button
             onClick={() => setShowDebugPanel(true)}
-            className="flex-shrink-0 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 px-2 py-1 rounded transition-colors"
+            className="text-xs bg-gray-700/50 hover:bg-gray-600/50 text-gray-300 px-3 py-1.5 rounded-lg transition-all duration-200 border border-gray-600/50"
           >
             Show
           </button>
@@ -113,73 +115,82 @@ export function DebugStream({ lastEvent, className = '' }: DebugStreamProps) {
   }
   
   return (
-    <div className={`bg-gray-900 rounded-lg flex flex-col h-full overflow-hidden ${className}`}>
-      <div className="flex items-center justify-between p-3 sm:p-4 pb-2 border-b border-gray-700 flex-shrink-0">
-        <div className="flex items-center min-w-0 flex-1">
-          <div className="text-lg sm:text-xl mr-2 flex-shrink-0">🔍</div>
-          <h2 className="text-sm sm:text-lg font-semibold text-white truncate">Debug Stream</h2>
-          {isTranscribing.current && (
-            <div className="ml-2 flex items-center">
-              <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse mr-1"></div>
-              <span className="text-xs text-blue-400 hidden sm:inline">Transcribing...</span>
-            </div>
-          )}
-          {isInContextMode.current && (
-            <div className="ml-2 flex items-center">
-              <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse mr-1"></div>
-              <span className="text-xs text-yellow-400 hidden sm:inline">Context Mode</span>
-            </div>
-          )}
+    <div className={`elevated-card rounded-xl flex flex-col h-full overflow-hidden ${className}`}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800 flex-shrink-0">
+        <div className="flex items-center space-x-2 min-w-0 flex-1">
+          <div className="w-6 h-6 bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-lg flex items-center justify-center text-xs shadow-lg">
+            🔍
+          </div>
+          <h2 className="text-base font-semibold text-white">Debug Stream</h2>
+          <div className="flex items-center space-x-2">
+            {isTranscribing.current && (
+              <div className="status-indicator info">
+                <span className="text-xs font-medium">Transcribing</span>
+              </div>
+            )}
+            {isInContextMode.current && (
+              <div className="status-indicator warning">
+                <span className="text-xs font-medium">Context Mode</span>
+              </div>
+            )}
+          </div>
         </div>
         <button
           onClick={() => setShowDebugPanel(false)}
-          className="flex-shrink-0 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 px-2 py-1 rounded transition-colors"
+          className="text-xs bg-gray-700/50 hover:bg-gray-600/50 text-gray-300 px-2 py-1 rounded-lg transition-all duration-200 border border-gray-600/50"
         >
           Hide
         </button>
       </div>
       
+      {/* Content */}
       <div 
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto p-3 sm:p-4 pt-3 space-y-1 text-xs min-h-0 max-h-full"
+        className="flex-1 overflow-y-auto p-4 space-y-2 text-sm min-h-0 max-h-full"
       >
         {rawTranscripts.length === 0 && (
-          <div className="text-gray-500 text-center py-2">
-            Listening for speech...
+          <div className="text-center py-6">
+            <div className="w-10 h-10 bg-gradient-to-br from-gray-700 to-gray-800 rounded-xl flex items-center justify-center text-base mx-auto mb-3 opacity-60">
+              👂
+            </div>
+            <p className="text-gray-400 font-medium text-sm">Listening for speech...</p>
           </div>
         )}
         
         {rawTranscripts.map((transcript) => (
           <div
             key={transcript.id}
-            className={`p-2 rounded border-l-2 ${
+            className={`p-3 rounded-lg border transition-all duration-200 fade-in ${
               transcript.hasWakeWord
                 ? transcript.isProcessed
-                  ? 'bg-green-900/30 border-green-400 text-green-200'
-                  : 'bg-yellow-900/30 border-yellow-400 text-yellow-200'
+                  ? 'bg-green-900/30 border-green-700/50 text-green-200'
+                  : 'bg-yellow-900/30 border-yellow-700/50 text-yellow-200'
                 : transcript.isInContext
-                  ? 'bg-blue-900/30 border-blue-400 text-blue-200'
-                  : 'bg-gray-700/50 border-gray-600 text-gray-300'
+                  ? 'bg-blue-900/30 border-blue-700/50 text-blue-200'
+                  : 'bg-gray-800/50 border-gray-700/50 text-gray-300'
             }`}
           >
             <div className="flex items-start justify-between gap-2">
-              <span className="flex-1 break-words min-w-0">{transcript.content}</span>
+              <span className="flex-1 break-words min-w-0 leading-relaxed font-mono text-xs">
+                {transcript.content}
+              </span>
               <div className="flex items-center space-x-1 flex-shrink-0">
                 {transcript.hasWakeWord && (
-                  <span className={`px-1 py-0.5 rounded text-xs font-medium ${
+                  <span className={`px-1.5 py-0.5 rounded text-xs font-medium transition-all ${
                     transcript.isProcessed 
-                      ? 'bg-green-600 text-green-100' 
-                      : 'bg-yellow-600 text-yellow-100'
+                      ? 'bg-green-600/80 text-green-100 border border-green-500/50' 
+                      : 'bg-yellow-600/80 text-yellow-100 border border-yellow-500/50'
                   }`}>
                     {transcript.isProcessed ? '→ AI' : 'WAKE'}
                   </span>
                 )}
                 {transcript.isInContext && (
-                  <span className="px-1 py-0.5 rounded text-xs font-medium bg-blue-600 text-blue-100">
+                  <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-blue-600/80 text-blue-100 border border-blue-500/50">
                     CTX
                   </span>
                 )}
-                <span className="text-gray-400 text-xs">
+                <span className="text-gray-500 text-xs font-mono">
                   {formatTime(transcript.timestamp)}
                 </span>
               </div>

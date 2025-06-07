@@ -24,33 +24,56 @@ export function ToolIndicator({ toolState, className = '' }: ToolIndicatorProps)
   const getStatusColor = (action: string | null) => {
     switch (action) {
       case 'starting':
-        return 'bg-blue-500';
+        return 'bg-blue-500 shadow-blue-500/50';
       case 'capturing':
-        return 'bg-green-500';
+        return 'bg-green-500 shadow-green-500/50';
       case 'recording':
-        return 'bg-red-500';
+        return 'bg-red-500 shadow-red-500/50';
       default:
-        return 'bg-gray-500';
+        return 'bg-gray-500 shadow-gray-500/50';
+    }
+  };
+
+  const getStatusText = (action: string | null) => {
+    switch (action) {
+      case 'starting':
+        return 'Preparing...';
+      case 'capturing':
+        return 'Capturing';
+      case 'recording':
+        return 'Recording';
+      default:
+        return 'Processing';
     }
   };
 
   return (
-    <div className={`bg-black/80 backdrop-blur-sm rounded-lg px-4 py-3 text-white ${className}`}>
+    <div className={`glass-card rounded-xl px-4 py-3 text-white shadow-xl fade-in ${className}`}>
       <div className="flex items-center gap-3">
-        {/* Animated pulse indicator */}
-        <div className={`w-3 h-3 rounded-full ${getStatusColor(toolState.action)} ${toolState.active ? 'animate-pulse' : ''}`} />
+        {/* Tool icon */}
+        <div className="w-8 h-8 bg-gradient-to-br from-gray-700 to-gray-800 rounded-lg flex items-center justify-center shadow-lg">
+          <span className="text-sm">{getToolIcon(toolState.tool_name)}</span>
+        </div>
         
-        {/* Tool icon and status */}
-        <div className="flex items-center gap-2">
-          <span className="text-lg">{getToolIcon(toolState.tool_name)}</span>
-          <span className="text-sm font-medium">
-            {toolState.message || `${toolState.tool_name} ${toolState.action}`}
-          </span>
+        {/* Status content */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            {/* Animated pulse indicator */}
+            <div className={`w-2 h-2 rounded-full shadow-lg ${getStatusColor(toolState.action)} ${toolState.active ? 'animate-pulse' : ''}`} />
+            <span className="text-sm font-medium text-gray-100">
+              {toolState.message || getStatusText(toolState.action)}
+            </span>
+          </div>
+          
+          {/* Tool name subtitle */}
+          <div className="text-xs text-gray-300 font-medium uppercase tracking-wide">
+            {toolState.tool_name?.replace('get_', '') || 'Tool'}
+          </div>
         </div>
         
         {/* Duration indicator for video */}
         {toolState.tool_name === 'get_video' && toolState.duration && (
-          <div className="text-xs text-gray-300">
+          <div className="text-xs text-gray-300 font-mono bg-gray-800/50 px-2 py-1 rounded-md border border-gray-700/50">
             {toolState.duration}s
           </div>
         )}
@@ -58,9 +81,9 @@ export function ToolIndicator({ toolState, className = '' }: ToolIndicatorProps)
       
       {/* Progress bar for video recording */}
       {toolState.active && toolState.tool_name === 'get_video' && toolState.duration && (
-        <div className="mt-2 w-full bg-gray-700 rounded-full h-1">
+        <div className="mt-3 w-full bg-gray-800/50 rounded-full h-1.5 border border-gray-700/30">
           <div 
-            className="bg-red-500 h-1 rounded-full transition-all duration-1000 ease-linear"
+            className="bg-gradient-to-r from-red-500 to-red-600 h-full rounded-full shadow-lg shadow-red-500/30 transition-all duration-1000 ease-linear"
             style={{
               animation: `progress ${toolState.duration}s linear forwards`
             }}
