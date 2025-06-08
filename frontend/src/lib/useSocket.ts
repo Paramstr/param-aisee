@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 export interface Event {
   type: string;
   action: string;
-  data: Record<string, any>;
+  data: Record<string, unknown>;
   timestamp: string;
 }
 
@@ -142,12 +142,13 @@ export function useSocket(url: string): UseSocketReturn {
       case 'system_status':
         // Update system status from event data
         if (event.data?.status) {
-          setSystemStatus(event.data.status);
+          setSystemStatus(event.data.status as SystemStatus);
         }
         break;
         
       case 'tool_event':
         handleToolEvent(event.action, event.data);
+        // Also let components handle tool events via lastEvent
         break;
         
       // Add other event type handlers as needed

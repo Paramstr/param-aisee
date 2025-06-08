@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 
 interface Message {
   id: string;
@@ -150,10 +150,17 @@ function ToolMessageContent({
             <video
               className="w-full h-full object-cover"
               preload="metadata"
+              muted
+              playsInline
+              onLoadedMetadata={(e) => {
+                // Seek to first frame to show thumbnail
+                const video = e.currentTarget;
+                video.currentTime = 0.1;
+              }}
             >
               <source src={`data:video/mp4;base64,${message.videoBase64}`} type="video/mp4" />
             </video>
-            <div className="absolute inset-0 flex items-center justify-center">
+            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
               <div className="bg-black/60 backdrop-blur-sm rounded-full p-3 shadow-lg">
                 <div className="w-8 h-8 flex items-center justify-center text-white text-xl">▶</div>
               </div>

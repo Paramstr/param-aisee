@@ -107,6 +107,8 @@ class VideoRecorder:
                         "duration": duration,
                         "file_size": video_result.get("file_size", 0),
                         "file_path": video_result.get("file_path", ""),
+                        "video_base64": video_result.get("video_base64"),
+                        "frames_recorded": video_result.get("frames_recorded"),
                         "message": f"Video recording completed ({duration}s)",
                         "success": True
                     }
