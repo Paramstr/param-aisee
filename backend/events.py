@@ -13,6 +13,8 @@ class EventType(Enum):
     VISION_EVENT = "vision_event"          
     TTS_EVENT = "tts_event"               
     TOOL_EVENT = "tool_event"             # Tool execution events
+    VOICE_CONTROL = "voice_control"       # Voice dictation control events
+    CAMERA_CONTROL = "camera_control"     # Camera capture control events
     ERROR = "error"                       
 
 

@@ -106,6 +106,34 @@ class ManualMessageRequest(BaseModel):
     message: str
 
 
+class VoiceDictationToggleRequest(BaseModel):
+    enabled: bool
+
+
+class CameraCaptureToggleRequest(BaseModel):
+    enabled: bool
+
+
+@app.post("/voice/toggle")
+async def toggle_voice_dictation(request: VoiceDictationToggleRequest):
+    """Toggle voice dictation on/off"""
+    await container.audio_processor.set_voice_dictation_enabled(request.enabled)
+    return {
+        "message": f"Voice dictation {'enabled' if request.enabled else 'disabled'}",
+        "enabled": request.enabled
+    }
+
+
+@app.post("/camera/toggle")
+async def toggle_camera_capture(request: CameraCaptureToggleRequest):
+    """Toggle camera capture on/off"""
+    await container.vision_processor.set_camera_capture_enabled(request.enabled)
+    return {
+        "message": f"Camera capture {'enabled' if request.enabled else 'disabled'}",
+        "enabled": request.enabled
+    }
+
+
 @app.post("/conversation/send")
 async def send_manual_message(request: ManualMessageRequest):
     """Send a manual message to the AI for processing"""

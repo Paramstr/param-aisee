@@ -1,4 +1,7 @@
+'use client';
+
 import { Event, SystemStatus } from '@/lib/useSocket';
+import { useState } from 'react';
 
 interface StatusBarProps {
   isConnected: boolean;
@@ -6,6 +9,7 @@ interface StatusBarProps {
   lastEvent: Event | null;
   error: string | null;
   className?: string;
+  refreshSystemStatus?: () => void;
 }
 
 export function StatusBar({ 
@@ -13,8 +17,12 @@ export function StatusBar({
   systemStatus, 
   lastEvent, 
   error, 
-  className = '' 
+  className = '',
+  refreshSystemStatus 
 }: StatusBarProps) {
+  const [isToggling, setIsToggling] = useState(false);
+  const [isCameraToggling, setIsCameraToggling] = useState(false);
+
   const getStatusColor = (status: boolean) => {
     return status ? 'text-green-400' : 'text-gray-500';
   };
@@ -24,9 +32,79 @@ export function StatusBar({
       ? 'status-indicator success' 
       : 'status-indicator text-gray-500';
   };
+
+  const toggleVoiceDictation = async () => {
+    if (!systemStatus || isToggling) return;
+    
+    setIsToggling(true);
+    try {
+      const response = await fetch('/api/voice/toggle', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          enabled: !systemStatus.voice_dictation_enabled
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to toggle voice dictation');
+      }
+      
+      const result = await response.json();
+      
+      // Refresh system status to get updated state
+      if (refreshSystemStatus) {
+        await refreshSystemStatus();
+      }
+      
+    } catch (error) {
+      console.error('Error toggling voice dictation:', error);
+      // Optionally show user-visible error message
+    } finally {
+      setIsToggling(false);
+    }
+  };
+
+  const toggleCameraCapture = async () => {
+    if (!systemStatus || isCameraToggling) return;
+    
+    setIsCameraToggling(true);
+    try {
+      const response = await fetch('/api/camera/toggle', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          enabled: !systemStatus.camera_capture_enabled
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to toggle camera capture');
+      }
+      
+      const result = await response.json();
+      
+      // Refresh system status to get updated state
+      if (refreshSystemStatus) {
+        await refreshSystemStatus();
+      }
+      
+    } catch (error) {
+      console.error('Error toggling camera capture:', error);
+      // Optionally show user-visible error message
+    } finally {
+      setIsCameraToggling(false);
+    }
+  };
   
   const getLastEventDisplay = () => {
-    if (!lastEvent) return 'No events';
+    if (!lastEvent) return { icon: '📡', text: 'No events', color: 'text-gray-400' };
     
     // Handle new consolidated event system: type:action
     const eventKey = `${lastEvent.type}:${lastEvent.action}`;
@@ -54,6 +132,20 @@ export function StatusBar({
       // TTS events
       'tts_event:start': { icon: '🔊', text: 'Speaking', color: 'text-indigo-400' },
       'tts_event:end': { icon: '🔇', text: 'Speech complete', color: 'text-gray-400' },
+      
+      // Voice control events
+      'voice_control:dictation_toggled': { 
+        icon: lastEvent?.data?.enabled ? '🎤' : '🔇', 
+        text: `Voice dictation ${lastEvent?.data?.enabled ? 'enabled' : 'disabled'}`, 
+        color: lastEvent?.data?.enabled ? 'text-green-400' : 'text-orange-400' 
+      },
+      
+      // Camera control events
+      'camera_control:capture_toggled': { 
+        icon: lastEvent?.data?.enabled ? '📸' : '🔇', 
+        text: `Camera capture ${lastEvent?.data?.enabled ? 'enabled' : 'disabled'}`, 
+        color: lastEvent?.data?.enabled ? 'text-green-400' : 'text-orange-400' 
+      },
       
       // Vision events
       'vision_event:frame_captured': { icon: '📷', text: 'Frame captured', color: 'text-teal-400' },
@@ -136,11 +228,52 @@ export function StatusBar({
               </div>
               
               <div className="flex items-center justify-between p-2 bg-gray-800/50 rounded-lg border border-gray-700/50">
+                <span className="text-xs text-gray-300 font-medium">Voice Dictation</span>
+                <div className="flex items-center space-x-2">
+                  <div className={getStatusClasses(systemStatus.voice_dictation_enabled)}>
+                    <span className="text-xs font-medium">
+                      {systemStatus.voice_dictation_enabled ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={toggleVoiceDictation}
+                    disabled={!isConnected || isToggling}
+                    className={`
+                      px-2 py-1 text-xs rounded-md font-medium transition-colors
+                      ${systemStatus.voice_dictation_enabled 
+                        ? 'bg-orange-600 hover:bg-orange-500 text-white' 
+                        : 'bg-green-600 hover:bg-green-500 text-white'
+                      }
+                      ${(!isConnected || isToggling) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                    `}
+                  >
+                    {isToggling ? '...' : (systemStatus.voice_dictation_enabled ? 'Disable' : 'Enable')}
+                  </button>
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-between p-2 bg-gray-800/50 rounded-lg border border-gray-700/50">
                 <span className="text-xs text-gray-300 font-medium">Camera Capture</span>
-                <div className={getStatusClasses(systemStatus.vision_capturing)}>
-                  <span className="text-xs font-medium">
-                    {systemStatus.vision_capturing ? 'Active' : 'Inactive'}
-                  </span>
+                <div className="flex items-center space-x-2">
+                  <div className={getStatusClasses(systemStatus.camera_capture_enabled)}>
+                    <span className="text-xs font-medium">
+                      {systemStatus.camera_capture_enabled ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={toggleCameraCapture}
+                    disabled={!isConnected || isCameraToggling}
+                    className={`
+                      px-2 py-1 text-xs rounded-md font-medium transition-colors
+                      ${systemStatus.camera_capture_enabled 
+                        ? 'bg-orange-600 hover:bg-orange-500 text-white' 
+                        : 'bg-green-600 hover:bg-green-500 text-white'
+                      }
+                      ${(!isConnected || isCameraToggling) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                    `}
+                  >
+                    {isCameraToggling ? '...' : (systemStatus.camera_capture_enabled ? 'Disable' : 'Enable')}
+                  </button>
                 </div>
               </div>
               
