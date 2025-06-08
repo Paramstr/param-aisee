@@ -164,18 +164,32 @@ export function useSocket(url: string): UseSocketReturn {
     }
   };
 
-  const handleToolEvent = (action: string, data: Record<string, any>) => {
+  const handleToolEvent = (action: string, data: Record<string, unknown>) => {
+    console.log('🔧 handleToolEvent called:', { action, data });
+    
     switch (action) {
       case 'photo_start':
+        console.log('📸 Setting photo_start state');
         setToolState({
           active: true,
           tool_name: 'get_photo',
           action: 'starting',
           message: 'Preparing camera...',
         });
+        // Auto-clear after 10 seconds if no completion event
+        setTimeout(() => {
+          console.log('📸 Auto-clearing photo state after 10s timeout');
+          setToolState(prev => prev.active && prev.tool_name === 'get_photo' ? {
+            active: false,
+            tool_name: null,
+            action: null,
+            message: null,
+          } : prev);
+        }, 10000);
         break;
         
       case 'photo_capture':
+        console.log('📸 Setting photo_capture state');
         setToolState({
           active: true,
           tool_name: 'get_photo',
@@ -185,6 +199,7 @@ export function useSocket(url: string): UseSocketReturn {
         break;
         
       case 'photo_complete':
+        console.log('📸 Setting photo_complete state');
         setToolState({
           active: false,
           tool_name: 'get_photo',
@@ -193,6 +208,7 @@ export function useSocket(url: string): UseSocketReturn {
         });
         // Clear after 3 seconds
         setTimeout(() => {
+          console.log('📸 Clearing photo state after 3s');
           setToolState({
             active: false,
             tool_name: null,
@@ -203,34 +219,39 @@ export function useSocket(url: string): UseSocketReturn {
         break;
         
       case 'video_start':
+        console.log('🎥 Setting video_start state:', { duration: data.duration, tool: data.tool });
         setToolState({
           active: true,
-          tool_name: 'get_video',
+          tool_name: data.tool as string || 'get_video',
           action: 'starting',
-          message: 'Preparing video recording...',
-          duration: data.duration,
+          message: data.message as string || `Starting ${data.duration}s video recording...`,
+          duration: data.duration as number,
         });
         break;
         
       case 'video_recording':
-        setToolState({
+        console.log('🎥 Setting video_recording state:', { duration: data.duration });
+        setToolState(prev => ({
           active: true,
-          tool_name: 'get_video',
+          tool_name: prev.tool_name || 'get_video', // Preserve tool_name from previous state
           action: 'recording',
-          message: `Recording ${data.duration}s video...`,
-          duration: data.duration,
-        });
+          message: data.message as string || `Recording ${data.duration}s video...`,
+          duration: data.duration as number,
+        }));
         break;
         
       case 'video_complete':
-        setToolState({
+        console.log('🎥 Setting video_complete state:', { success: data.success });
+        setToolState(prev => ({
           active: false,
-          tool_name: 'get_video',
+          tool_name: prev.tool_name || 'get_video', // Preserve tool_name for completion display
           action: 'complete',
-          message: data.success ? 'Video recorded successfully' : 'Video recording failed',
-        });
+          message: data.message as string || (data.success ? 'Video recorded successfully' : 'Video recording failed'),
+          duration: prev.duration, // Preserve duration for completion display
+        }));
         // Clear after 3 seconds
         setTimeout(() => {
+          console.log('🎥 Clearing video state after 3s');
           setToolState({
             active: false,
             tool_name: null,
@@ -240,8 +261,29 @@ export function useSocket(url: string): UseSocketReturn {
         }, 3000);
         break;
         
+      case 'video_error':
+        console.log('🎥 Setting video_error state:', { error: data.error });
+        setToolState(prev => ({
+          active: false,
+          tool_name: prev.tool_name || 'get_video',
+          action: 'error',
+          message: data.message as string || `Video error: ${data.error}`,
+          duration: prev.duration,
+        }));
+        // Clear after 5 seconds for errors
+        setTimeout(() => {
+          console.log('🎥 Clearing video error state after 5s');
+          setToolState({
+            active: false,
+            tool_name: null,
+            action: null,
+            message: null,
+          });
+        }, 5000);
+        break;
+        
       default:
-        console.log('Unhandled tool event action:', action);
+        console.log('❓ Unhandled tool event action:', action);
     }
   };
 

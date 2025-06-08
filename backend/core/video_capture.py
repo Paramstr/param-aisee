@@ -93,37 +93,34 @@ class VideoRecorder:
             # Validate duration
             duration = max(1, min(300, duration))  # Clamp to 1-300 seconds (5 minutes)
             
-            await event_bus.publish(Event(
-                type=EventType.TOOL_EVENT,
-                action="recording_start",
-                data={
-                    "duration": duration,
-                    "message": f"Starting {duration}-second video recording"
-                }
-            ))
+
             
             # Start recording
             video_result = await self._record_video_async(duration)
             
             if video_result["success"]:
+                logger.info(f"🎬 VideoRecorder: Publishing video_complete event (success)")
                 await event_bus.publish(Event(
                     type=EventType.TOOL_EVENT,
-                    action="recording_complete",
+                    action="video_complete",
                     data={
                         "duration": duration,
                         "file_size": video_result.get("file_size", 0),
                         "file_path": video_result.get("file_path", ""),
-                        "message": f"Video recording completed ({duration}s)"
+                        "message": f"Video recording completed ({duration}s)",
+                        "success": True
                     }
                 ))
             else:
+                logger.info(f"🎬 VideoRecorder: Publishing video_complete event (failure)")
                 await event_bus.publish(Event(
                     type=EventType.TOOL_EVENT,
-                    action="recording_failed",
+                    action="video_complete",
                     data={
                         "duration": duration,
                         "error": video_result.get("error"),
-                        "message": f"Video recording failed: {video_result.get('error')}"
+                        "message": f"Video recording failed: {video_result.get('error')}",
+                        "success": False
                     }
                 ))
             
@@ -133,11 +130,12 @@ class VideoRecorder:
             logger.error(f"Video recording error: {e}")
             await event_bus.publish(Event(
                 type=EventType.TOOL_EVENT,
-                action="recording_failed",
+                action="video_complete",
                 data={
                     "duration": duration,
                     "error": str(e),
-                    "message": f"Video recording failed: {e}"
+                    "message": f"Video recording failed: {e}",
+                    "success": False
                 }
             ))
             
@@ -191,6 +189,27 @@ class VideoRecorder:
             
             logger.info(f"🎬 Video writer initialized with {fourcc_to_string(self.best_fourcc)}/MP4 format")
             logger.info(f"📁 Saving video to: {video_path}")
+            
+            # Small delay to make UI transitions visible and ensure proper state updates
+            logger.info(f"🎬 Waiting 1s before starting recording to allow UI transition...")
+            await asyncio.sleep(1.0)  # Increased from 0.5s to 1.0s for better UI visibility
+            
+            # Publish recording start event
+            logger.info(f"🎬 VideoRecorder: Publishing video_recording event for {duration}s")
+            await event_bus.publish(Event(
+                type=EventType.TOOL_EVENT,
+                action="video_recording",
+                data={
+                    "tool": "get_video",
+                    "duration": duration,
+                    "message": f"Recording {duration}s video..."
+                }
+            ))
+            
+            # Small additional delay to ensure the recording state is visible in UI
+            await asyncio.sleep(0.1)
+            
+            logger.info(f"🎬 Starting actual frame recording for {duration}s...")
             
             # Record video frames - pass dimensions for reference
             result = await self._record_frames(video_writer, duration, width, height)

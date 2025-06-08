@@ -229,6 +229,97 @@ async def test_transcript(transcript: str):
     return {"message": f"Transcript event triggered: {transcript}"}
 
 
+@app.post("/test-video-start")
+async def test_video_start(duration: int = 3):
+    """Test endpoint to simulate video_start event"""
+    await event_bus.publish(Event(
+        type=EventType.TOOL_EVENT,
+        action="video_start",
+        data={
+            "tool": "get_video",
+            "duration": duration
+        }
+    ))
+    return {"message": f"video_start event triggered with duration {duration}s"}
+
+
+@app.post("/test-video-recording")
+async def test_video_recording(duration: int = 3):
+    """Test endpoint to simulate video_recording event"""
+    await event_bus.publish(Event(
+        type=EventType.TOOL_EVENT,
+        action="video_recording",
+        data={
+            "duration": duration,
+            "message": f"Recording {duration}s video..."
+        }
+    ))
+    return {"message": f"video_recording event triggered with duration {duration}s"}
+
+
+@app.post("/test-video-complete")
+async def test_video_complete(success: bool = True, duration: int = 1):
+    """Test endpoint to simulate video_complete event"""
+    await event_bus.publish(Event(
+        type=EventType.TOOL_EVENT,
+        action="video_complete",
+        data={
+            "tool": "get_video",
+            "duration": duration,
+            "success": success,
+            "frames_recorded": duration * 30,
+            "file_size": 1024
+        }
+    ))
+    return {"message": f"video_complete event triggered (success={success})"}
+
+
+@app.post("/test-video-sequence")
+async def test_video_sequence(duration: int = 3, delay: float = 3.0):
+    """Test endpoint to simulate full video recording sequence with delays"""
+    
+    # Step 1: video_start
+    await event_bus.publish(Event(
+        type=EventType.TOOL_EVENT,
+        action="video_start",
+        data={
+            "tool": "get_video", 
+            "duration": duration
+        }
+    ))
+    
+    # Wait a bit
+    await asyncio.sleep(delay)
+    
+    # Step 2: video_recording  
+    await event_bus.publish(Event(
+        type=EventType.TOOL_EVENT,
+        action="video_recording", 
+        data={
+            "duration": duration,
+            "message": f"Recording {duration}s video..."
+        }
+    ))
+    
+    # Wait for "recording duration"
+    await asyncio.sleep(delay)
+    
+    # Step 3: video_complete
+    await event_bus.publish(Event(
+        type=EventType.TOOL_EVENT,
+        action="video_complete",
+        data={
+            "tool": "get_video",
+            "duration": duration, 
+            "success": True,
+            "frames_recorded": duration * 30,
+            "file_size": 1024
+        }
+    ))
+    
+    return {"message": f"Full video sequence triggered with {delay}s delays"}
+
+
 class DeviceUpdateRequest(BaseModel):
     device_type: str  # "audio" or "video"
     device_id: int
