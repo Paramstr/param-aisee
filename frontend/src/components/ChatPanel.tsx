@@ -194,7 +194,7 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
     }
   }, [lastEvent]);
 
-  const handleAudioEvent = (action: string, data: Record<string, any>) => {
+  const handleAudioEvent = (action: string, data: Record<string, unknown>) => {
     switch (action) {
       case 'transcription_start':
         isTranscribing.current = true;
@@ -203,7 +203,7 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
         isTranscribing.current = false;
         break;
       case 'raw_transcript':
-        const rawTranscript = data?.transcript;
+        const rawTranscript = data?.transcript as string;
         if (rawTranscript && rawTranscript.trim() && isInContextMode.current) {
           currentContext.current = currentContext.current 
             ? `${currentContext.current} ${rawTranscript}` 
@@ -212,10 +212,10 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
         break;
       case 'wake_word_detected':
         isInContextMode.current = true;
-        currentContext.current = data?.transcript || '';
+        currentContext.current = (data?.transcript as string) || '';
         break;
       case 'context_ready':
-        const transcript = data?.transcript;
+        const transcript = data?.transcript as string;
         if (transcript) {
           const lastClientMessage = messages[messages.length - 1];
           const shouldAddNewUserMessage = !(
@@ -243,7 +243,7 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
     }
   };
 
-  const handleLLMEvent = (action: string, data: Record<string, any>) => {
+  const handleLLMEvent = (action: string, data: Record<string, unknown>) => {
     switch (action) {
       case 'response_start':
         setCurrentResponse('');
@@ -251,13 +251,13 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
         setCurrentResponseImageBase64(null);
         break;
       case 'response_chunk':
-        const chunk = data?.chunk;
+        const chunk = data?.chunk as string;
         if (chunk) {
           setCurrentResponse(prev => prev + chunk);
         }
         break;
       case 'response_end':
-        const fullResponse = data?.full_response;
+        const fullResponse = data?.full_response as string;
         if (fullResponse) {
           const assistantMessage: Message = {
             id: Date.now().toString(),
@@ -276,94 +276,38 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
     }
   };
 
-  const handleToolEvent = (action: string, data: Record<string, any>) => {
+  const handleToolEvent = (action: string, data: Record<string, unknown>) => {
     switch (action) {
-      case 'video_start':
-        const duration = data?.duration || 3;
-        const toolMessage: Message = {
-          id: 'video_' + Date.now().toString(),
-          type: 'assistant',
-          content: `🎥 Recording ${duration}-second video to analyze...`,
-          timestamp: new Date(),
-          isComplete: true
-        };
-        setMessages(prev => [...prev, toolMessage]);
-        break;
-        
-      case 'photo_start':
-        const photoMessage: Message = {
-          id: 'photo_' + Date.now().toString(),
-          type: 'assistant',
-          content: `📸 Capturing photo for analysis...`,
-          timestamp: new Date(),
-          isComplete: true
-        };
-        setMessages(prev => [...prev, photoMessage]);
-        break;
-        
       case 'photo_complete':
         const capturedPhotoData = data;
-        if (capturedPhotoData?.success) {
-          setMessages(prev => {
-            const updated = prev.map(msg => {
-              if (msg.id.startsWith('photo_') && msg.content.includes('Capturing photo for analysis')) {
-                return { ...msg, content: `✅ Photo captured successfully` };
-              }
-              return msg;
-            });
-            
-            if (capturedPhotoData.photo_base64) {
-              const photoToolMessage: Message = {
-                id: Date.now().toString(),
-                type: 'tool',
-                content: 'Photo captured',
-                timestamp: new Date(),
-                isComplete: true,
-                imageBase64: capturedPhotoData.photo_base64,
-                toolName: 'get_photo'
-              };
-              updated.push(photoToolMessage);
-            }
-            
-            return updated;
-          });
-        } else {
-          setMessages(prev => prev.map(msg => 
-            msg.id.startsWith('photo_') && msg.content.includes('Capturing photo for analysis')
-              ? { ...msg, content: `❌ Photo capture failed` }
-              : msg
-          ));
+        if (capturedPhotoData?.success && capturedPhotoData.photo_base64) {
+          const photoToolMessage: Message = {
+            id: Date.now().toString(),
+            type: 'tool',
+            content: 'Photo captured',
+            timestamp: new Date(),
+            isComplete: true,
+            imageBase64: capturedPhotoData.photo_base64 as string,
+            toolName: 'get_photo'
+          };
+          setMessages(prev => [...prev, photoToolMessage]);
         }
         break;
         
       case 'video_complete':
         const videoData = data;
-        if (videoData?.success) {
-          setMessages(prev => prev.map(msg => 
-            msg.id.startsWith('video_') && msg.content.includes('Recording') && msg.content.includes('video to analyze')
-              ? { ...msg, content: `✅ Video recorded successfully (${videoData.duration}s)` }
-              : msg
-          ));
-          
-          if (videoData.video_base64) {
-            const videoMessage: Message = {
-              id: Date.now().toString(),
-              type: 'tool',
-              content: `Video captured (${videoData.duration}s, ${videoData.frames_recorded} frames)`,
-              timestamp: new Date(),
-              isComplete: true,
-              videoBase64: videoData.video_base64,
-              duration: videoData.duration,
-              toolName: 'get_video'
-            };
-            setMessages(prev => [...prev, videoMessage]);
-          }
-        } else {
-          setMessages(prev => prev.map(msg => 
-            msg.id.startsWith('video_') && msg.content.includes('Recording') && msg.content.includes('video to analyze')
-              ? { ...msg, content: `❌ Video recording failed` }
-              : msg
-          ));
+        if (videoData?.success && videoData.video_base64) {
+          const videoMessage: Message = {
+            id: Date.now().toString(),
+            type: 'tool',
+            content: `Video captured (${videoData.duration}s, ${videoData.frames_recorded} frames)`,
+            timestamp: new Date(),
+            isComplete: true,
+            videoBase64: videoData.video_base64 as string,
+            duration: videoData.duration as number,
+            toolName: 'get_video'
+          };
+          setMessages(prev => [...prev, videoMessage]);
         }
         break;
     }
@@ -418,7 +362,7 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
                 🎤
               </div>
               <h3 className="text-base font-semibold text-gray-300 mb-2">Ready to Listen</h3>
-              <p className="text-gray-400 mb-2 text-sm">Say "Osmo" to start a conversation</p>
+              <p className="text-gray-400 mb-2 text-sm">Say &ldquo;Osmo&rdquo; to start a conversation</p>
               <div className="space-y-1 text-xs text-gray-500">
                 <p>Context will accumulate until 2 seconds of silence</p>
                 <p>You can also type messages below ↓</p>

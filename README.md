@@ -55,7 +55,6 @@ osmo-assistant/
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd osmo-assistant
 
 # Create and activate Python virtual environment
 python3 -m venv .venv

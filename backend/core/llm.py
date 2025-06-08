@@ -137,6 +137,12 @@ class LLMProcessor:
                 action="llm_processing_failed",
                 data={"error": f"LLM processing failed: {e}"}
             ))
+            # Always publish response_end to reset frontend UI state
+            await event_bus.publish(Event(
+                type=EventType.LLM_EVENT,
+                action="response_end", 
+                data={"full_response": ""}
+            ))
         finally:
             self.is_processing = False
     

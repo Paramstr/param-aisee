@@ -116,52 +116,43 @@ class VideoTool(Tool):
             # Validate duration
             duration = max(1, min(300, int(duration)))  # Clamp between 1-300 seconds (5 minutes)
             
+            logger.info(f"🎬 VideoTool: Publishing video_start event for {duration}s")
             await event_bus.publish(Event(
                 type=EventType.TOOL_EVENT,
                 action="video_start",
                 data={
                     "tool": self.name,
-                    "duration": duration
+                    "duration": duration,
+                    "message": f"Starting {duration}s video recording..."
                 }
             ))
             
-            # Record video
+            # Record video - VideoRecorder will handle recording and completion events
+            logger.info(f"🎬 VideoTool: Calling video_recorder.record_video({duration})")
             video_result = await self.video_recorder.record_video(duration)
             
-            if not video_result["success"]:
-                raise Exception(video_result.get("error", "Unknown video recording error"))
-            
-            await event_bus.publish(Event(
-                type=EventType.TOOL_EVENT,
-                action="video_complete",
-                data={
-                    "tool": self.name,
-                    "duration": duration,
-                    "video_base64": video_result.get("video_base64"),
-                    "frames_recorded": video_result.get("frames_recorded"),
-                    "file_size": video_result.get("file_size"),
-                    "success": True
-                }
-            ))
-            
+            # VideoRecorder already publishes video_complete event, so we just return the result
             return {
-                "success": True,
+                "success": video_result.get("success", False),
                 "video_base64": video_result.get("video_base64"),
                 "file_path": video_result.get("file_path"),
                 "duration": duration,
                 "frames_recorded": video_result.get("frames_recorded"),
-                "message": f"Video recorded successfully ({duration}s, {video_result.get('frames_recorded', 0)} frames)"
+                "error": video_result.get("error"),
+                "message": f"Video recording {'completed' if video_result.get('success') else 'failed'} ({duration}s, {video_result.get('frames_recorded', 0)} frames)"
             }
             
         except Exception as e:
             logger.error(f"Video capture failed: {e}")
+            # Still publish error event from VideoTool level
             await event_bus.publish(Event(
                 type=EventType.TOOL_EVENT,
-                action="video_failed",
+                action="video_error",
                 data={
                     "tool": self.name,
                     "duration": duration,
                     "error": str(e),
+                    "message": f"Video recording failed: {e}",
                     "success": False
                 }
             ))

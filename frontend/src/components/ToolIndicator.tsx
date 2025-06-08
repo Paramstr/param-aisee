@@ -1,4 +1,5 @@
 import { ToolState } from '@/lib/useSocket';
+import { useEffect } from 'react';
 
 interface ToolIndicatorProps {
   toolState: ToolState;
@@ -6,10 +7,29 @@ interface ToolIndicatorProps {
 }
 
 export function ToolIndicator({ toolState, className = '' }: ToolIndicatorProps) {
-  if (!toolState.active && !toolState.message) {
-    return null;
-  }
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('🔧 ToolIndicator render:', toolState);
+    if (toolState.tool_name === 'get_video') {
+      console.log('🎥 Video tool state details:', {
+        active: toolState.active,
+        action: toolState.action,
+        duration: toolState.duration,
+        message: toolState.message,
+        shouldShowProgressBar: toolState.active && toolState.tool_name === 'get_video' && toolState.action === 'recording' && toolState.duration
+      });
+    }
+  }, [toolState]);
 
+  // Force re-render logging for debugging
+  console.log('🔧 ToolIndicator force render check:', {
+    active: toolState.active,
+    tool_name: toolState.tool_name,
+    action: toolState.action,
+    timestamp: Date.now()
+  });
+  
   const getToolIcon = (toolName: string | null) => {
     switch (toolName) {
       case 'get_photo':
@@ -28,7 +48,11 @@ export function ToolIndicator({ toolState, className = '' }: ToolIndicatorProps)
       case 'capturing':
         return 'bg-green-500 shadow-green-500/50';
       case 'recording':
-        return 'bg-red-500 shadow-red-500/50';
+        return 'bg-red-500 shadow-red-500/50 animate-pulse';
+      case 'complete':
+        return 'bg-purple-500 shadow-purple-500/50';
+      case 'error':
+        return 'bg-red-600 shadow-red-600/50';
       default:
         return 'bg-gray-500 shadow-gray-500/50';
     }
@@ -41,17 +65,38 @@ export function ToolIndicator({ toolState, className = '' }: ToolIndicatorProps)
       case 'capturing':
         return 'Capturing';
       case 'recording':
-        return 'Recording';
+        return '🔴 RECORDING';
+      case 'complete':
+        return 'Complete';
+      case 'error':
+        return 'Error';
       default:
         return 'Processing';
     }
   };
 
+  // Don't show indicator if no active tool or recent completion
+  if (!toolState.active && !toolState.tool_name) {
+    console.log('🔧 ToolIndicator: Not showing - no active tool and no tool_name');
+    return null;
+  }
+  
+  // Show indicator for active tools or recent completions
+  const shouldShow = toolState.active || toolState.tool_name;
+  if (!shouldShow) {
+    console.log('🔧 ToolIndicator: Not showing - shouldShow is false');
+    return null;
+  }
+
   return (
-    <div className={`glass-card rounded-xl px-4 py-3 text-white shadow-xl fade-in ${className}`}>
+    <div className={`glass-card rounded-xl px-4 py-3 text-white shadow-xl fade-in ${
+      toolState.action === 'recording' ? 'ring-2 ring-red-500 bg-red-900/20' : ''
+    } ${className}`}>
       <div className="flex items-center gap-3">
         {/* Tool icon */}
-        <div className="w-8 h-8 bg-gradient-to-br from-gray-700 to-gray-800 rounded-lg flex items-center justify-center shadow-lg">
+        <div className={`w-8 h-8 bg-gradient-to-br from-gray-700 to-gray-800 rounded-lg flex items-center justify-center shadow-lg ${
+          toolState.action === 'recording' ? 'animate-pulse' : ''
+        }`}>
           <span className="text-sm">{getToolIcon(toolState.tool_name)}</span>
         </div>
         
@@ -60,7 +105,9 @@ export function ToolIndicator({ toolState, className = '' }: ToolIndicatorProps)
           <div className="flex items-center gap-2 mb-1">
             {/* Animated pulse indicator */}
             <div className={`w-2 h-2 rounded-full shadow-lg ${getStatusColor(toolState.action)} ${toolState.active ? 'animate-pulse' : ''}`} />
-            <span className="text-sm font-medium text-gray-100">
+            <span className={`text-sm font-medium ${
+              toolState.action === 'recording' ? 'text-red-200 font-bold' : 'text-gray-100'
+            }`}>
               {toolState.message || getStatusText(toolState.action)}
             </span>
           </div>
@@ -73,28 +120,38 @@ export function ToolIndicator({ toolState, className = '' }: ToolIndicatorProps)
         
         {/* Duration indicator for video */}
         {toolState.tool_name === 'get_video' && toolState.duration && (
-          <div className="text-xs text-gray-300 font-mono bg-gray-800/50 px-2 py-1 rounded-md border border-gray-700/50">
+          <div className={`text-xs text-gray-300 font-mono bg-gray-800/50 px-2 py-1 rounded-md border border-gray-700/50 ${
+            toolState.action === 'recording' ? 'animate-pulse text-red-300 border-red-500/50' : ''
+          }`}>
             {toolState.duration}s
           </div>
         )}
       </div>
       
       {/* Progress bar for video recording */}
-      {toolState.active && toolState.tool_name === 'get_video' && toolState.duration && (
-        <div className="mt-3 w-full bg-gray-800/50 rounded-full h-1.5 border border-gray-700/30">
+      {toolState.active && toolState.tool_name === 'get_video' && toolState.action === 'recording' && toolState.duration && (
+        <div className="mt-3 w-full bg-gray-800/50 rounded-full h-2 border border-red-500/30 shadow-lg">
           <div 
-            className="bg-gradient-to-r from-red-500 to-red-600 h-full rounded-full shadow-lg shadow-red-500/30 transition-all duration-1000 ease-linear"
+            key={`progress-${toolState.action}-${toolState.duration}`}
+            className="bg-gradient-to-r from-red-500 to-red-600 h-full rounded-full shadow-lg shadow-red-500/50 animate-pulse"
             style={{
-              animation: `progress ${toolState.duration}s linear forwards`
+              animation: `progressBar ${toolState.duration}s linear forwards`,
+              animationDelay: '0s'
             }}
           />
         </div>
       )}
       
       <style jsx>{`
-        @keyframes progress {
-          from { width: 0%; }
-          to { width: 100%; }
+        @keyframes progressBar {
+          from { 
+            width: 0%; 
+            opacity: 1;
+          }
+          to { 
+            width: 100%; 
+            opacity: 1;
+          }
         }
       `}</style>
     </div>
