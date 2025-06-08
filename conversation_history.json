@@ -874,7 +874,98 @@
       "content": "The photo shows a person indoors with a natural and serene background, featuring plants and a hint of outdoor scenery through the window. The individual appears to be in a relaxed environment, possibly an office or a home with a modern aesthetic. The lighting is soft and natural, enhancing the calm atmosphere of the setting. If you have any specific details or analysis you're looking for, feel free to let me know!",
       "timestamp": 1749289482.56546,
       "metadata": {}
+    },
+    {
+      "id": "1749304893.463264",
+      "type": "user",
+      "content": "And where will these come up? They will show up here.",
+      "timestamp": 1749304893.4632692,
+      "metadata": {}
+    },
+    {
+      "id": "1749304899.466042",
+      "type": "assistant",
+      "content": "The images or videos you capture will appear right here in our conversation. Once you use the camera tool, the media will be processed and analyzed, and I'll provide feedback based on what you've captured. If you need to capture something specific, just let me know!",
+      "timestamp": 1749304899.466055,
+      "metadata": {}
+    },
+    {
+      "id": "1749304931.048344",
+      "type": "user",
+      "content": "Well, you can just imagine being like, Osmo, go and do this.",
+      "timestamp": 1749304931.048348,
+      "metadata": {}
+    },
+    {
+      "id": "1749304935.026451",
+      "type": "assistant",
+      "content": "Sure, I can assist with any tasks you have in mind! If you'd like, just tell me what you need help with, and I'll guide you through it. Whether it's answering questions, planning, or analyzing something, I'm here to help. What would you like to do next?",
+      "timestamp": 1749304935.026459,
+      "metadata": {}
+    },
+    {
+      "id": "1749305020.086797",
+      "type": "user",
+      "content": "The whole house of Dutch fucking street guys are staying at 10 fucking... On a Saturday night. And tomorrow, yes on a Saturday night, it's the proof. And they're here in the morning on Sunday. Yes!",
+      "timestamp": 1749305020.086808,
+      "metadata": {}
+    },
+    {
+      "id": "1749305026.711591",
+      "type": "assistant",
+      "content": "It sounds like you're describing a situation involving a group of people staying at a location, possibly causing some concern. If you're looking for advice or help with this situation, feel free to provide more details. I'm here to assist you in any way I can, but please keep the language respectful. If there's a specific issue or question you have, let me know!",
+      "timestamp": 1749305026.711597,
+      "metadata": {}
+    },
+    {
+      "id": "1749305131.806034",
+      "type": "user",
+      "content": "So can you have multiple chats open?",
+      "timestamp": 1749305131.806038,
+      "metadata": {}
+    },
+    {
+      "id": "1749305137.174104",
+      "type": "assistant",
+      "content": "Currently, I'm designed to handle one conversation at a time to ensure I provide focused and personalized assistance. If you need help with different topics, you can switch between them within our conversation. Just let me know what you'd like to discuss next!",
+      "timestamp": 1749305137.174109,
+      "metadata": {}
+    },
+    {
+      "id": "1749305925.332550",
+      "type": "user",
+      "content": "Now ask it. Hey Osmo. Where it's not connected to the back end. The back end's not right. Well how do you know? Top record now.",
+      "timestamp": 1749305925.332554,
+      "metadata": {}
+    },
+    {
+      "id": "1749305936.732190",
+      "type": "assistant",
+      "content": "It seems like you're trying to troubleshoot a technical issue, possibly related to a system or application that's not connecting to its backend properly. To better understand the problem, could you provide more details about the symptoms or errors you're encountering? If there's a specific action or setting that's causing the issue, let me know, and I'll do my best to assist you.\n\nIf you think a video demonstration would help clarify the issue, we can record a short clip. Would you like to proceed with that?",
+      "timestamp": 1749305936.732198,
+      "metadata": {}
+    },
+    {
+      "id": "1749306011.835357",
+      "type": "user",
+      "content": "Okay. Hey, Osmo. Describe my face to me after you start seeing it. Go.",
+      "timestamp": 1749306011.835364,
+      "metadata": {}
+    },
+    {
+      "id": "1749306021.189749",
+      "type": "assistant",
+      "content": "You have a friendly and approachable appearance. You're wearing glasses with a rectangular frame, and your hair is short and neatly styled. You have a light beard and mustache, and you're smiling slightly, which gives off a warm vibe. You're dressed in a light-colored, casual shirt, and the background suggests you're in a well-lit, modern space with some greenery and spherical lights. It looks like a pleasant environment!",
+      "timestamp": 1749306021.189755,
+      "metadata": {}
+    },
+    {
+      "id": "1749306059.024699",
+      "type": "user",
+      "content": "You have a friendly and approachable appearance. You're wearing glasses with a rectangular frame, and your hair is short and neatly styled. You have a light beard and mustache, and you're smiling slightly, which gives off a warm vibe. You're dressed in a light-colored, casual shirt, and the background suggests you're in a well-lit, modern space with some greenery and spherical lights. It looks like a pleasant environment. Hey, Osmo, record a 20-second video of me and describe to me for every second what I do.",
+      "timestamp": 1749306059.024705,
+      "metadata": {}
     }
   ],
-  "last_updated": 1749289482.566785
+  "last_updated": 1749306059.0282629
 }

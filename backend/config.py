@@ -18,9 +18,9 @@ class Settings(BaseSettings):
     
     # Vision configuration
     camera_index: int = 0  # Default to first available camera
-    camera_width: int = 1280
-    camera_height: int = 720
-    camera_fps: int = 60
+    camera_width: int = 640   # Start with VGA resolution (widely supported)
+    camera_height: int = 480  # VGA height
+    camera_fps: int = 30      # 30fps is widely supported (60fps often fails)
     
     # LLM configuration
     max_tokens: int = 1000

@@ -220,6 +220,45 @@ The assistant includes built-in tools:
 - **False positives**: The system detects "Osmo" from transcription, so clear audio helps
 - **Adjust sensitivity**: Modify `SILENCE_DURATION_THRESHOLD` for different speech patterns
 
+## Camera Troubleshooting
+
+If you're experiencing camera issues (e.g., the `/frame` endpoint returns 404 or "No frame available"):
+
+### Quick Fix
+The app now includes **automatic camera detection** with fallback settings. If your camera doesn't work with the default settings, it will automatically try:
+- 1280x720 @ 30fps (HD)
+- 640x480 @ 30fps (VGA) 
+- 640x480 @ 15fps (VGA low)
+- 320x240 @ 30fps (Basic)
+
+### Manual Camera Testing
+Run the camera detection utility to find your optimal settings:
+
+```bash
+source .venv/bin/activate
+cd backend
+python camera_test_utility.py
+```
+
+This will test your camera capabilities and provide recommended settings.
+
+### Manual Configuration
+If needed, you can manually configure camera settings in your `.env` file:
+
+```bash
+# Camera settings (adjust based on your hardware)
+CAMERA_INDEX=0        # Usually 0 for built-in camera
+CAMERA_WIDTH=640      # Resolution width
+CAMERA_HEIGHT=480     # Resolution height  
+CAMERA_FPS=30         # Frame rate (30 is more compatible than 60)
+```
+
+### Common Issues
+- **60fps doesn't work**: Most cameras support 30fps better than 60fps
+- **High resolution fails**: Try 640x480 instead of 1280x720
+- **macOS permission**: Ensure camera access is granted in System Preferences
+- **Other apps using camera**: Close Zoom, Teams, etc. before running Osmo
+
 ## Development
 
 ### Backend Development

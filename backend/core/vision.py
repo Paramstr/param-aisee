@@ -71,30 +71,69 @@ class VisionProcessor:
         logger.info("Vision processor stopped")
     
     def _init_camera(self) -> bool:
-        """Initialize camera"""
-        try:
-            self.camera = cv2.VideoCapture(settings.camera_index)
-            
-            if not self.camera.isOpened():
-                logger.error(f"Cannot open camera at index {settings.camera_index}")
-                return False
-            
-            # Set camera properties
-            self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, settings.camera_width)
-            self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, settings.camera_height)
-            self.camera.set(cv2.CAP_PROP_FPS, settings.camera_fps)
-            
-            # Test frame capture
-            ret, frame = self.camera.read()
-            if not ret:
-                logger.error("Failed to capture test frame")
-                return False
-            
-            logger.info(f"Camera initialized: {frame.shape[1]}x{frame.shape[0]} @ {settings.camera_fps}fps")
-            return True
-        except Exception as e:
-            logger.error(f"Camera initialization error: {e}")
-            return False
+        """Initialize camera with fallback settings"""
+        # Define fallback configurations (from highest to lowest preference)
+        fallback_configs = [
+            # Try user's preferred settings first
+            (settings.camera_width, settings.camera_height, settings.camera_fps),
+            # Common fallbacks in order of preference
+            (1280, 720, 30),  # HD at 30fps
+            (640, 480, 30),   # VGA at 30fps
+            (640, 480, 15),   # VGA at 15fps
+            (320, 240, 30),   # QVGA at 30fps
+        ]
+        
+        for width, height, fps in fallback_configs:
+            try:
+                logger.info(f"Trying camera settings: {width}x{height} @ {fps}fps")
+                
+                self.camera = cv2.VideoCapture(settings.camera_index)
+                
+                if not self.camera.isOpened():
+                    logger.error(f"Cannot open camera at index {settings.camera_index}")
+                    continue
+                
+                # Set camera properties
+                self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+                self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+                self.camera.set(cv2.CAP_PROP_FPS, fps)
+                
+                # Verify settings were applied (cameras often ignore unsupported settings)
+                actual_width = int(self.camera.get(cv2.CAP_PROP_FRAME_WIDTH))
+                actual_height = int(self.camera.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                actual_fps = int(self.camera.get(cv2.CAP_PROP_FPS))
+                
+                # Test frame capture multiple times to ensure stability
+                for test_attempt in range(3):
+                    ret, frame = self.camera.read()
+                    if not ret:
+                        logger.warning(f"Failed to capture test frame (attempt {test_attempt + 1})")
+                        if test_attempt == 2:  # Last attempt failed
+                            break
+                        time.sleep(0.1)
+                        continue
+                    else:
+                        # Success! Log the working configuration
+                        logger.info(f"✅ Camera initialized successfully:")
+                        logger.info(f"   Requested: {width}x{height} @ {fps}fps")
+                        logger.info(f"   Actual: {actual_width}x{actual_height} @ {actual_fps}fps")
+                        logger.info(f"   Frame shape: {frame.shape}")
+                        return True
+                
+                # If we get here, frame capture failed
+                logger.warning(f"Frame capture test failed for {width}x{height} @ {fps}fps")
+                self.camera.release()
+                self.camera = None
+                
+            except Exception as e:
+                logger.error(f"Camera initialization error with {width}x{height} @ {fps}fps: {e}")
+                if self.camera:
+                    self.camera.release()
+                    self.camera = None
+        
+        # All configurations failed
+        logger.error("❌ All camera configurations failed")
+        return False
     
     def _capture_loop(self):
         """Main camera capture loop"""
