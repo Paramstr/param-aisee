@@ -23,6 +23,7 @@ class TaskManager:
             EventType.SYSTEM_STATUS: {
                 "listening": self._handle_system_listening,
                 "camera_active": self._handle_system_camera_active,
+                "camera_disabled": self._handle_system_camera_disabled,
                 "whisper_loading": self._handle_system_whisper_loading,
                 "whisper_ready": self._handle_system_whisper_ready,
                 "system_ready": self._handle_system_ready,
@@ -53,6 +54,12 @@ class TaskManager:
                 "video_complete": self._handle_video_complete,
                 "recording_start": self._handle_recording_start,
                 "recording_complete": self._handle_recording_complete,
+            },
+            EventType.VOICE_CONTROL: {
+                "dictation_toggled": self._handle_voice_dictation_toggled,
+            },
+            EventType.CAMERA_CONTROL: {
+                "capture_toggled": self._handle_camera_capture_toggled,
             },
             EventType.ERROR: {
                 "*": self._handle_error,  # Handle all error actions
@@ -175,6 +182,10 @@ class TaskManager:
     async def _handle_system_camera_active(self, event: Event):
         """Handle camera activation"""
         logger.info("📹 Camera activated")
+    
+    async def _handle_system_camera_disabled(self, event: Event):
+        """Handle camera disabled"""
+        logger.info("📹 Camera disabled")
     
     async def _handle_system_whisper_loading(self, event: Event):
         """Handle Whisper model loading"""
@@ -301,6 +312,20 @@ class TaskManager:
         file_size = event.data.get("file_size", 0)
         logger.debug(f"🎬 Recording completed: {duration}s, {file_size} bytes")
     
+    # Voice control handlers
+    async def _handle_voice_dictation_toggled(self, event: Event):
+        """Handle voice dictation toggle"""
+        enabled = event.data.get("enabled", False)
+        status = "🎤" if enabled else "🔇"
+        logger.info(f"{status} Voice dictation {'enabled' if enabled else 'disabled'}")
+    
+    # Camera control handlers
+    async def _handle_camera_capture_toggled(self, event: Event):
+        """Handle camera capture toggle"""
+        enabled = event.data.get("enabled", False)
+        status = "📸" if enabled else "🔇"
+        logger.info(f"{status} Camera capture {'enabled' if enabled else 'disabled'}")
+    
     # Error handler
     async def _handle_error(self, event: Event):
         """Handle error events"""
@@ -313,7 +338,9 @@ class TaskManager:
         return {
             "is_running": self.is_running,
             "audio_listening": self.audio_processor.is_listening if self.audio_processor else False,
+            "voice_dictation_enabled": self.audio_processor.is_voice_dictation_enabled() if self.audio_processor else False,
             "vision_capturing": self.vision_processor.is_capturing if self.vision_processor else False,
+            "camera_capture_enabled": self.vision_processor.is_camera_capture_enabled() if self.vision_processor else False,
             "llm_processing": self.llm_processor.is_processing if self.llm_processor else False,
             "whisper_loaded": self.audio_processor.whisper_model_loaded if self.audio_processor else False,
         }

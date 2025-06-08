@@ -96,7 +96,7 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
     setMessages(prev => [...prev, userMessage]);
     
     try {
-      const response = await fetch('http://localhost:8000/conversation/send', {
+      const response = await fetch('/api/conversation/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: messageToSend }),
@@ -117,7 +117,7 @@ export function ChatPanel({ lastEvent, className = '' }: ChatPanelProps) {
       
       let errorContent = 'Unknown error occurred';
       if (error instanceof TypeError && error.message.includes('fetch')) {
-        errorContent = 'Cannot connect to Osmo Assistant. Please make sure the backend is running on http://localhost:8000';
+        errorContent = 'Cannot connect to Osmo Assistant. Please check your connection and try again.';
       } else if (error instanceof Error) {
         errorContent = `Error: ${error.message}`;
       }

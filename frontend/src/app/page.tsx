@@ -9,7 +9,7 @@ import { ToolIndicator } from '@/components/ToolIndicator';
 import { DeviceSelector } from '@/components/DeviceSelector';
 
 export default function Home() {
-  const { isConnected, lastEvent, systemStatus, toolState, error } = useSocket('ws://localhost:8000/ws');
+  const { isConnected, lastEvent, systemStatus, toolState, error, refreshSystemStatus } = useSocket('ws://localhost:8000/ws');
 
   return (
     <div className="h-screen max-h-screen bg-gradient-to-br from-gray-850 via-gray-950 to-gray-800 flex flex-col overflow-hidden">
@@ -90,6 +90,7 @@ export default function Home() {
                     systemStatus={systemStatus}
                     lastEvent={lastEvent}
                     error={error}
+                    refreshSystemStatus={refreshSystemStatus}
                     className="h-full"
                   />
                 </div>

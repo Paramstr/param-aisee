@@ -20,6 +20,9 @@ class VisionProcessor:
         self.capture_thread: Optional[threading.Thread] = None
         self.should_stop = False
         
+        # Camera capture control
+        self.camera_capture_enabled = True  # Default to enabled
+        
         # Latest frame storage
         self._latest_frame: Optional[np.ndarray] = None
         self._latest_jpeg: Optional[bytes] = None
@@ -31,6 +34,16 @@ class VisionProcessor:
     async def start_capture(self):
         """Start camera capture"""
         if self.is_capturing:
+            return
+        
+        # Check if camera capture is enabled
+        if not self.camera_capture_enabled:
+            logger.info("Camera capture is disabled, skipping initialization")
+            await event_bus.publish(Event(
+                type=EventType.SYSTEM_STATUS,
+                action="camera_disabled",
+                data={"message": "Camera capture is disabled"}
+            ))
             return
         
         if not self._init_camera():
@@ -141,6 +154,11 @@ class VisionProcessor:
         frame_time = 1.0 / fps_target
         
         while not self.should_stop and self.camera:
+            # Skip processing if camera capture is disabled
+            if not self.camera_capture_enabled:
+                time.sleep(0.1)
+                continue
+                
             start_time = time.time()
             
             try:
@@ -186,16 +204,28 @@ class VisionProcessor:
     
     def get_latest_frame(self) -> Optional[np.ndarray]:
         """Get the latest captured frame (already flipped)"""
+        # Return None if camera capture is disabled
+        if not self.camera_capture_enabled:
+            return None
+            
         with self._frame_lock:
             return self._latest_frame.copy() if self._latest_frame is not None else None
     
     def get_latest_jpeg(self) -> Optional[bytes]:
         """Get the latest frame as JPEG bytes"""
+        # Return None if camera capture is disabled
+        if not self.camera_capture_enabled:
+            return None
+            
         with self._frame_lock:
             return self._latest_jpeg
     
     def get_latest_jpeg_base64(self) -> Optional[str]:
         """Get the latest frame as base64 encoded JPEG"""
+        # Return None if camera capture is disabled
+        if not self.camera_capture_enabled:
+            return None
+            
         jpeg_bytes = self.get_latest_jpeg()
         if jpeg_bytes:
             return base64.b64encode(jpeg_bytes).decode('utf-8')
@@ -203,6 +233,10 @@ class VisionProcessor:
     
     def capture_frame_for_llm(self) -> Optional[str]:
         """Capture current frame and return as base64 for LLM processing"""
+        # Return None if camera capture is disabled
+        if not self.camera_capture_enabled:
+            return None
+            
         frame = self.get_latest_frame()
         if frame is None:
             return None
@@ -237,6 +271,39 @@ class VisionProcessor:
         except Exception as e:
             logger.error(f"Error capturing frame for LLM: {e}")
             return None
+
+    async def set_camera_capture_enabled(self, enabled: bool):
+        """Enable or disable camera capture"""
+        if self.camera_capture_enabled == enabled:
+            return  # No change needed
+        
+        self.camera_capture_enabled = enabled
+        
+        if enabled:
+            # Re-enable camera capture
+            if not self.is_capturing:
+                await self.start_capture()
+        else:
+            # Disable camera capture - stop capturing but keep the processor alive
+            await self.stop_capture()
+            
+            # Clear any stored frames
+            with self._frame_lock:
+                self._latest_frame = None
+                self._latest_jpeg = None
+        
+        # Publish camera control event
+        await event_bus.publish(Event(
+            type=EventType.CAMERA_CONTROL,
+            action="capture_toggled",
+            data={"enabled": enabled}
+        ))
+        
+        logger.info(f"Camera capture {'enabled' if enabled else 'disabled'}")
+
+    def is_camera_capture_enabled(self) -> bool:
+        """Check if camera capture is enabled"""
+        return self.camera_capture_enabled
 
 
 # Remove global instance - will be handled by dependency injection

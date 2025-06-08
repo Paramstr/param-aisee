@@ -10,7 +10,9 @@ export interface Event {
 export interface SystemStatus {
   is_running: boolean;
   audio_listening: boolean;
+  voice_dictation_enabled: boolean;
   vision_capturing: boolean;
+  camera_capture_enabled: boolean;
   llm_processing: boolean;
   whisper_loaded: boolean;
 }
@@ -29,6 +31,7 @@ interface UseSocketReturn {
   systemStatus: SystemStatus | null;
   toolState: ToolState;
   error: string | null;
+  refreshSystemStatus: () => void;
 }
 
 export function useSocket(url: string): UseSocketReturn {
@@ -48,6 +51,18 @@ export function useSocket(url: string): UseSocketReturn {
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
   const reconnectDelay = useRef(1000);
+
+  const refreshSystemStatus = useCallback(async () => {
+    try {
+      const response = await fetch('/api/status');
+      if (response.ok) {
+        const status = await response.json();
+        setSystemStatus(status);
+      }
+    } catch (err) {
+      console.error('Failed to refresh system status:', err);
+    }
+  }, []);
 
   const connect = useCallback(() => {
     try {
@@ -149,6 +164,34 @@ export function useSocket(url: string): UseSocketReturn {
       case 'tool_event':
         handleToolEvent(event.action, event.data);
         // Also let components handle tool events via lastEvent
+        break;
+        
+      case 'voice_control':
+        // Voice dictation events - refresh system status
+        if (event.action === 'dictation_toggled') {
+          // Update the system status locally to reflect the change immediately
+          if (systemStatus) {
+            const updatedStatus = {
+              ...systemStatus,
+              voice_dictation_enabled: event.data.enabled
+            };
+            setSystemStatus(updatedStatus);
+          }
+        }
+        break;
+        
+      case 'camera_control':
+        // Camera capture events - refresh system status
+        if (event.action === 'capture_toggled') {
+          // Update the system status locally to reflect the change immediately
+          if (systemStatus) {
+            const updatedStatus = {
+              ...systemStatus,
+              camera_capture_enabled: event.data.enabled
+            };
+            setSystemStatus(updatedStatus);
+          }
+        }
         break;
         
       // Add other event type handlers as needed
@@ -307,5 +350,6 @@ export function useSocket(url: string): UseSocketReturn {
     systemStatus,
     toolState,
     error,
+    refreshSystemStatus,
   };
 } 

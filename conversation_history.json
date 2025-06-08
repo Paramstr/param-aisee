@@ -965,7 +965,63 @@
       "content": "You have a friendly and approachable appearance. You're wearing glasses with a rectangular frame, and your hair is short and neatly styled. You have a light beard and mustache, and you're smiling slightly, which gives off a warm vibe. You're dressed in a light-colored, casual shirt, and the background suggests you're in a well-lit, modern space with some greenery and spherical lights. It looks like a pleasant environment. Hey, Osmo, record a 20-second video of me and describe to me for every second what I do.",
       "timestamp": 1749306059.024705,
       "metadata": {}
+    },
+    {
+      "id": "1749349996.834444",
+      "type": "user",
+      "content": "Hey Osmo, say something back.",
+      "timestamp": 1749349996.834456,
+      "metadata": {}
+    },
+    {
+      "id": "1749350027.335444",
+      "type": "assistant",
+      "content": "Throughout the video, you appear to be in a relaxed setting, possibly at home or in a casual office. You're seated and seem to be engaging with something off-camera, perhaps a computer or a device. Your expressions and gestures suggest you're explaining or demonstrating something. The environment is well-lit, with soft lighting that creates a comfortable atmosphere. There are no significant changes in your position or the background, indicating a steady and focused interaction. If you'd like a more detailed analysis of your actions or if there's a particular aspect you'd like me to focus on, just let me know!",
+      "timestamp": 1749350027.3354518,
+      "metadata": {}
+    },
+    {
+      "id": "1749351372.787682",
+      "type": "user",
+      "content": "Osmond.",
+      "timestamp": 1749351372.787689,
+      "metadata": {}
+    },
+    {
+      "id": "1749351378.132988",
+      "type": "assistant",
+      "content": "It seems there might have been a mix-up with the name. I'm Osmo, here to assist you. How can I help you today? If you need a video analysis or any other assistance, just let me know!",
+      "timestamp": 1749351378.132998,
+      "metadata": {}
+    },
+    {
+      "id": "1749363184.261314",
+      "type": "user",
+      "content": "do i looked fatigued",
+      "timestamp": 1749363184.261332,
+      "metadata": {}
+    },
+    {
+      "id": "1749363195.710903",
+      "type": "assistant",
+      "content": "From the photo, you don't appear to be showing obvious signs of fatigue. Your posture is upright, and you seem to be in a relaxed environment. However, fatigue can sometimes be subtle and not always visible. If you're feeling tired, it's important to listen to your body and take breaks when needed. If you have any specific concerns or need further advice, feel free to ask!",
+      "timestamp": 1749363195.710908,
+      "metadata": {}
+    },
+    {
+      "id": "1749363496.674159",
+      "type": "user",
+      "content": "hey osmo analyze my posture and recommend me adjustments fast",
+      "timestamp": 1749363496.674166,
+      "metadata": {}
+    },
+    {
+      "id": "1749363510.652185",
+      "type": "assistant",
+      "content": "From the photo, your posture appears to be fairly relaxed, but there are a few adjustments you can make for better ergonomics:\n\n1. **Head Position**: Try to keep your head more centered over your shoulders. It looks like it might be slightly forward, which can strain your neck and shoulders over time.\n2. **Shoulder Alignment**: Ensure your shoulders are relaxed and not hunched. You might want to gently pull them back and down.\n3. **Chair Support**: Make sure your chair provides good lumbar support. If it doesn't, consider using a cushion or adjusting the chair to better support your lower back.\n\nThese small adjustments can help improve your posture and reduce strain. If you're sitting for long periods, remember to take breaks and stretch. If you have any discomfort, it's always a good idea to consult with a healthcare professional.",
+      "timestamp": 1749363510.652191,
+      "metadata": {}
     }
   ],
-  "last_updated": 1749306059.0282629
+  "last_updated": 1749363510.65348
 }

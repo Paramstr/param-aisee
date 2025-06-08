@@ -28,6 +28,9 @@ class AudioProcessor:
         self.is_transcribing = False
         self.is_recording = False
         
+        # Voice dictation control
+        self.voice_dictation_enabled = True  # Default to enabled
+        
         # VAD state management
         self.vad_state = "IDLE"  # IDLE, SPEAKING, SILENCE_DETECTED
         self.speech_frames = []  # Accumulated speech frames
@@ -194,6 +197,10 @@ class AudioProcessor:
 
     async def _process_vad_frame(self, audio_frame: np.ndarray):
         """Process audio frame through VAD state machine"""
+        # Skip processing if voice dictation is disabled
+        if not self.voice_dictation_enabled:
+            return
+            
         # Ensure frame is the right size for VAD
         if len(audio_frame) != self.frame_size:
             return
@@ -418,9 +425,32 @@ class AudioProcessor:
         self.context_buffer = []
 
     def _contains_wake_word(self, transcript: str) -> bool:
-        """Check if transcript contains wake word"""
+        """Check if transcript contains any wake word (case-insensitive)"""
         transcript_lower = transcript.lower()
         return any(wake_word in transcript_lower for wake_word in self.wake_words)
+
+    async def set_voice_dictation_enabled(self, enabled: bool):
+        """Enable or disable voice dictation"""
+        if self.voice_dictation_enabled == enabled:
+            return  # No change needed
+        
+        self.voice_dictation_enabled = enabled
+        
+        # Reset VAD state when toggling
+        self._reset_vad_state()
+        
+        # Publish voice control event
+        await event_bus.publish(Event(
+            type=EventType.VOICE_CONTROL,
+            action="dictation_toggled",
+            data={"enabled": enabled}
+        ))
+        
+        logger.info(f"Voice dictation {'enabled' if enabled else 'disabled'}")
+
+    def is_voice_dictation_enabled(self) -> bool:
+        """Check if voice dictation is enabled"""
+        return self.voice_dictation_enabled
 
 
 # Remove global instance - now handled by dependency injection

@@ -13,7 +13,7 @@ export function CameraFeed({ className = '' }: CameraFeedProps) {
   
   const fetchFrame = async () => {
     try {
-      const response = await fetch('http://localhost:8000/frame');
+      const response = await fetch('/api/frame');
       
       if (response.ok) {
         const blob = await response.blob();
