@@ -18,14 +18,8 @@ from .conversation import conversation_storage
 
 logger = logging.getLogger(__name__)
 
-# Import qwen_vl_utils for proper video processing
-try:
-    from qwen_vl_utils import process_vision_info
-    QWEN_VL_UTILS_AVAILABLE = True
-    logger.info("qwen_vl_utils imported successfully")
-except ImportError as e:
-    logger.warning(f"qwen_vl_utils not available: {e}")
-    QWEN_VL_UTILS_AVAILABLE = False
+# Video processing now uses stable CPU-only OpenCV method
+# Removed qwen_vl_utils dependency to fix memory corruption issues
 
 
 class LLMProcessor:
@@ -544,93 +538,142 @@ No other content, punctuation, or chain-of-thought.
             self.tts_process = None
 
     def _prepare_video_message_for_api(self, video_path: str, duration: int, frames_recorded: int) -> dict:
-        """Prepare video message using qwen_vl_utils for proper API format"""
-        if not QWEN_VL_UTILS_AVAILABLE:
-            logger.error("qwen_vl_utils not available, cannot process video")
-            return {
-                "role": "user",
-                "content": f"Tool result: Video recorded successfully ({duration}s, {frames_recorded} frames), but video processing library not available."
-            }
+        """
+        Prepare video message using stable CPU-only processing.
         
+        This replaces the problematic qwen_vl_utils approach which caused memory corruption
+        due to PyTorch tensor memory management issues and deprecated torchvision usage.
+        
+        Original qwen_vl_utils approach problems:
+        - PyTorch tensor memory management conflicts
+        - Deprecated torchvision video decoding with memory bugs  
+        - GPU/Metal driver conflicts
+        - Complex reference counting leading to double-free errors
+        
+        Our stable approach:
+        1. Use OpenCV (CPU-only) for reliable video decoding
+        2. Manual frame sampling with explicit memory management  
+        3. Direct JPEG encoding without PyTorch tensors
+        4. Explicit cleanup to prevent memory leaks
+        """
         try:
-            # Set environment variable to prevent Metal GPU conflicts
+            import cv2
+            import gc  # For explicit garbage collection
             import os
-            original_metal_env = os.environ.get('PYTORCH_ENABLE_MPS_FALLBACK')
-            os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
             
-            # Also disable Metal device selection to prevent GPU conflicts
-            original_device_env = os.environ.get('CUDA_VISIBLE_DEVICES') 
-            os.environ['CUDA_VISIBLE_DEVICES'] = ''
-            # Create a video message in the format expected by qwen_vl_utils
-            video_message = [{
-                "content": [{
-                    "type": "video",
-                    "video": f"file://{video_path}",
-                    "fps": 1.0,  # Use 1 FPS for efficiency
-                    "max_pixels": 1280 * 28 * 28,  # Reasonable size limit
-                    "min_pixels": 56 * 28 * 28
-                }]
-            }]
+            logger.info(f"Processing video with stable CPU-only method: {video_path}")
+            logger.info(f"Replaced qwen_vl_utils to fix memory corruption issues")
             
-            logger.info(f"Processing video with qwen_vl_utils: {video_path}")
-            
-            # Use qwen_vl_utils to process the video
-            # Wrap in try-catch to detect Metal conflicts specifically
-            try:
-                image_inputs, video_inputs, video_kwargs = process_vision_info(video_message, return_video_kwargs=True)
-            except Exception as metal_error:
-                if "Metal" in str(metal_error) or "AGX" in str(metal_error) or "CommandBuffer" in str(metal_error):
-                    logger.warning(f"Metal GPU conflict detected: {metal_error}")
-                    # Fall back to simple manual processing without GPU acceleration
-                    return self._fallback_video_processing(video_path, duration, frames_recorded)
-                else:
-                    raise  # Re-raise if it's not a Metal error
-            
-            if video_inputs is None:
-                logger.error("qwen_vl_utils failed to process video")
+            # Verify video file exists and is readable
+            if not os.path.exists(video_path):
+                logger.error(f"Video file does not exist: {video_path}")
                 return {
-                    "role": "user", 
-                    "content": f"Tool result: Video recorded successfully ({duration}s, {frames_recorded} frames), but failed to extract frames for analysis."
+                    "role": "user",
+                    "content": f"Tool result: Video file not found for processing."
                 }
             
-            # Convert tensor to numpy array
-            video_input = video_inputs.pop().permute(0, 2, 3, 1).numpy().astype(np.uint8)
-            fps_list = video_kwargs.get('fps', [])
+            # Open video file using OpenCV (CPU only)
+            cap = cv2.VideoCapture(video_path)
+            if not cap.isOpened():
+                logger.error("Failed to open video file for processing")
+                return {
+                    "role": "user",
+                    "content": f"Tool result: Video recorded successfully ({duration}s, {frames_recorded} frames), but could not process for analysis."
+                }
             
-            logger.info(f"Extracted {len(video_input)} frames using qwen_vl_utils")
+            try:
+                frames = []
+                frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                fps = cap.get(cv2.CAP_PROP_FPS)
+                
+                # Sample up to 12 frames evenly distributed (optimized for analysis)
+                max_frames = min(12, frame_count)
+                if frame_count > max_frames:
+                    frame_indices = np.linspace(0, frame_count - 1, max_frames, dtype=int)
+                else:
+                    frame_indices = list(range(frame_count))
+                
+                logger.info(f"CPU processing: sampling {len(frame_indices)} frames from {frame_count} total")
+                
+                # Extract frames with memory safety
+                for frame_idx in frame_indices:
+                    try:
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+                        ret, frame = cap.read()
+                        if ret and frame is not None:
+                            # Create a copy to avoid memory aliasing issues
+                            frame_copy = frame.copy()
+                            frames.append(frame_copy)
+                            # Explicitly delete the original frame reference
+                            del frame
+                        else:
+                            logger.warning(f"Failed to read frame {frame_idx}")
+                    except Exception as frame_error:
+                        logger.warning(f"Error reading frame {frame_idx}: {frame_error}")
+                        continue
+                
+            finally:
+                # Always release the video capture object
+                cap.release()
             
-            # Limit frames to prevent large payloads
-            max_frames = 10  # Reduced from 30 to prevent hanging
-            if len(video_input) > max_frames:
-                # Sample frames evenly
-                indices = np.linspace(0, len(video_input) - 1, max_frames, dtype=int)
-                video_input = video_input[indices]
-                logger.info(f"Sampled down to {len(video_input)} frames")
+            if not frames:
+                logger.error("No frames could be extracted")
+                return {
+                    "role": "user", 
+                    "content": f"Tool result: Video recorded successfully ({duration}s, {frames_recorded} frames), but frame extraction failed."
+                }
             
-            # Encode frames as base64 JPEG
+            # Encode frames as JPEG base64 with explicit memory management
             base64_frames = []
-            for i, frame in enumerate(video_input):
+            for i, frame in enumerate(frames):
                 try:
-                    img = Image.fromarray(frame)
+                    # Convert BGR to RGB (OpenCV uses BGR, but we want RGB for consistency)
+                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    
+                    # Convert to PIL Image
+                    img = Image.fromarray(frame_rgb)
+                    
+                    # Resize if too large (memory optimization)
+                    max_dimension = 800
+                    if max(img.size) > max_dimension:
+                        img.thumbnail((max_dimension, max_dimension), Image.Resampling.LANCZOS)
+                    
+                    # Encode as JPEG with controlled quality
                     output_buffer = BytesIO()
-                    img.save(output_buffer, format="jpeg", quality=75)  # Reduced quality for smaller size
+                    img.save(output_buffer, format="JPEG", quality=75, optimize=True)
                     byte_data = output_buffer.getvalue()
+                    
+                    # Clean up intermediate objects immediately
+                    output_buffer.close()
+                    del img, frame_rgb
+                    
+                    # Convert to base64
                     base64_str = base64.b64encode(byte_data).decode("utf-8")
                     base64_frames.append(base64_str)
+                    
+                    # Clean up byte data
+                    del byte_data, base64_str
+                    
                 except Exception as e:
                     logger.warning(f"Failed to encode frame {i}: {e}")
                     continue
+                finally:
+                    # Force cleanup of frame data
+                    del frames[i]
+            
+            # Clean up frames list and force garbage collection
+            del frames
+            gc.collect()  # Explicit garbage collection to prevent memory buildup
             
             if not base64_frames:
                 logger.error("No frames could be encoded")
                 return {
                     "role": "user",
-                    "content": f"Tool result: Video recorded successfully ({duration}s, {frames_recorded} frames), but frame encoding failed."
+                    "content": f"Tool result: Video recorded successfully ({duration}s, {frames_recorded} frames), but encoding failed."
                 }
             
-            logger.info(f"Successfully encoded {len(base64_frames)} frames for API")
+            logger.info(f"CPU processing successful: {len(base64_frames)} frames encoded safely")
             
-            # Return the properly formatted message
             return {
                 "role": "user",
                 "content": [
@@ -648,120 +691,13 @@ No other content, punctuation, or chain-of-thought.
             }
             
         except Exception as e:
-            logger.error(f"Failed to process video with qwen_vl_utils: {e}")
+            logger.error(f"Video processing failed: {e}")
+            # Force garbage collection on error too
+            import gc
+            gc.collect()
             return {
                 "role": "user",
                 "content": f"Tool result: Video recorded successfully ({duration}s, {frames_recorded} frames), but processing failed: {str(e)}"
-            }
-        finally:
-            # Restore original environment variables
-            try:
-                if original_metal_env is not None:
-                    os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = original_metal_env
-                else:
-                    os.environ.pop('PYTORCH_ENABLE_MPS_FALLBACK', None)
-                    
-                if original_device_env is not None:
-                    os.environ['CUDA_VISIBLE_DEVICES'] = original_device_env  
-                else:
-                    os.environ.pop('CUDA_VISIBLE_DEVICES', None)
-            except Exception as cleanup_error:
-                logger.warning(f"Failed to restore environment variables: {cleanup_error}")
-
-    def _fallback_video_processing(self, video_path: str, duration: int, frames_recorded: int) -> dict:
-        """Fallback video processing that avoids GPU operations to prevent Metal conflicts"""
-        try:
-            import cv2
-            
-            logger.info(f"Using fallback video processing for: {video_path}")
-            
-            # Open video file using OpenCV (CPU only)
-            cap = cv2.VideoCapture(video_path)
-            if not cap.isOpened():
-                logger.error("Failed to open video file for fallback processing")
-                return {
-                    "role": "user",
-                    "content": f"Tool result: Video recorded successfully ({duration}s, {frames_recorded} frames), but could not process for analysis."
-                }
-            
-            frames = []
-            frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            fps = cap.get(cv2.CAP_PROP_FPS)
-            
-            # Sample up to 8 frames evenly distributed
-            max_frames = min(8, frame_count)
-            if frame_count > max_frames:
-                frame_indices = np.linspace(0, frame_count - 1, max_frames, dtype=int)
-            else:
-                frame_indices = list(range(frame_count))
-            
-            logger.info(f"Fallback processing: sampling {len(frame_indices)} frames from {frame_count} total")
-            
-            for frame_idx in frame_indices:
-                cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
-                ret, frame = cap.read()
-                if ret:
-                    frames.append(frame)
-                else:
-                    logger.warning(f"Failed to read frame {frame_idx}")
-            
-            cap.release()
-            
-            if not frames:
-                logger.error("No frames could be extracted in fallback mode")
-                return {
-                    "role": "user", 
-                    "content": f"Tool result: Video recorded successfully ({duration}s, {frames_recorded} frames), but frame extraction failed."
-                }
-            
-            # Encode frames as JPEG base64 (CPU only)
-            base64_frames = []
-            for i, frame in enumerate(frames):
-                try:
-                    # Convert BGR to RGB
-                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    img = Image.fromarray(frame_rgb)
-                    
-                    # Encode as JPEG
-                    output_buffer = BytesIO()
-                    img.save(output_buffer, format="jpeg", quality=70)
-                    byte_data = output_buffer.getvalue()
-                    base64_str = base64.b64encode(byte_data).decode("utf-8")
-                    base64_frames.append(base64_str)
-                except Exception as e:
-                    logger.warning(f"Failed to encode frame {i} in fallback mode: {e}")
-                    continue
-            
-            if not base64_frames:
-                logger.error("No frames could be encoded in fallback mode")
-                return {
-                    "role": "user",
-                    "content": f"Tool result: Video recorded successfully ({duration}s, {frames_recorded} frames), but encoding failed."
-                }
-            
-            logger.info(f"Fallback processing successful: {len(base64_frames)} frames encoded")
-            
-            return {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": f"Tool result: Video recorded successfully ({duration}s, {len(base64_frames)} frames extracted via fallback processing). Here's the video:"
-                    },
-                    {
-                        "type": "video_url",
-                        "video_url": {
-                            "url": f"data:video/jpeg;base64,{','.join(base64_frames)}"
-                        }
-                    }
-                ]
-            }
-            
-        except Exception as e:
-            logger.error(f"Fallback video processing failed: {e}")
-            return {
-                "role": "user",
-                "content": f"Tool result: Video recorded successfully ({duration}s, {frames_recorded} frames), but both primary and fallback processing failed."
             }
 
 

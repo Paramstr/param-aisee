@@ -9,6 +9,7 @@ opencv-python-headless
 pillow
 python-dotenv
 webrtcvad
-qwen-vl-utils
-torch
-torchvision
+# Removed problematic dependencies that caused memory corruption:
+# - qwen-vl-utils (PyTorch tensor memory issues)
+# - torch (not needed for CPU-only video processing)  
+# - torchvision (deprecated video capabilities with memory bugs)
