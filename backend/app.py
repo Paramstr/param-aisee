@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
@@ -367,6 +367,57 @@ async def set_inference_mode(request: InferenceModeRequest):
     except Exception as e:
         logger.error(f"Error setting inference mode: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class SystemPromptRequest(BaseModel):
+    prompt: str
+
+
+@app.post("/bus-demo/system-prompt")
+async def set_system_prompt(request: SystemPromptRequest):
+    """Update the system prompt for inference"""
+    try:
+        result = bus_demo_manager.set_system_prompt(request.prompt)
+        return result
+    except Exception as e:
+        logger.error(f"Error setting system prompt: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/bus-demo/system-prompt")
+async def get_system_prompt():
+    """Get the current system prompt"""
+    try:
+        prompt = bus_demo_manager.get_system_prompt()
+        return {"prompt": prompt}
+    except Exception as e:
+        logger.error(f"Error getting system prompt: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/bus-demo/upload")
+async def upload_video(file: UploadFile = File(...)):
+    """Upload a custom MP4 video for detection"""
+    try:
+        # Validate file type
+        if not file.filename or not file.filename.lower().endswith('.mp4'):
+            raise HTTPException(status_code=400, detail="Only MP4 files are supported")
+        
+        # Read file content
+        video_content = await file.read()
+        
+        # Upload via bus demo manager
+        result = await bus_demo_manager.upload_video(video_content, file.filename)
+        
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading video: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to upload video: {str(e)}")
 
 
 # ================== TEST ENDPOINTS ==================

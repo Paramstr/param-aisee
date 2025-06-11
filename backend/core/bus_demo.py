@@ -8,6 +8,8 @@ from pathlib import Path
 import cv2
 from PIL import Image
 import moondream as md
+import shutil
+import tempfile
 
 from ..events import event_bus, Event, EventType
 from ..config import settings
@@ -23,6 +25,7 @@ class VisionProcessor:
         self.cloud_available = False
         self.local_available = False
         self.use_cloud = False  # Default to local
+        self.system_prompt = "What bus numbers can you see in this image? Look for route numbers, bus numbers, or destination numbers clearly visible on buses. Respond with just the numbers you can see. If you cannot see any bus numbers respond with null."
         
     async def initialize(self):
         """Initialize both Moondream Cloud and local Moondream Server"""
@@ -59,7 +62,22 @@ class VisionProcessor:
         
         if not self.cloud_available and not self.local_available:
             logger.error("Neither Moondream Cloud nor local server available!")
-        
+    
+    def set_system_prompt(self, prompt: str) -> Dict:
+        """Update the system prompt for inference"""
+        old_prompt = self.system_prompt
+        self.system_prompt = prompt
+        logger.info(f"Updated system prompt from '{old_prompt[:50]}...' to '{prompt[:50]}...'")
+        return {
+            "message": "System prompt updated successfully",
+            "old_prompt": old_prompt,
+            "new_prompt": prompt
+        }
+    
+    def get_system_prompt(self) -> str:
+        """Get the current system prompt"""
+        return self.system_prompt
+
     async def _test_cloud_connection(self) -> bool:
         """Test if Moondream Cloud is working"""
         try:
@@ -82,18 +100,21 @@ class VisionProcessor:
             logger.warning(f"Moondream Server test failed: {e}")
             return False
     
-    async def detect_bus_number(self, frame, query: str = "What bus numbers can you see in this image?") -> Dict:
+    async def detect_bus_number(self, frame, query: Optional[str] = None) -> Dict:
         """Detect bus numbers using either Moondream Cloud or local server"""
+        # Use provided query or fall back to system prompt
+        query_text = query or self.system_prompt
+        
         if self.use_cloud and self.cloud_available:
-            return await self._detect_cloud(frame, query)
+            return await self._detect_cloud(frame, query_text)
         elif not self.use_cloud and self.local_available:
-            return await self._detect_local(frame, query)
+            return await self._detect_local(frame, query_text)
         else:
             # Fallback to available option
             if self.cloud_available:
-                return await self._detect_cloud(frame, query)
+                return await self._detect_cloud(frame, query_text)
             elif self.local_available:
-                return await self._detect_local(frame, query)
+                return await self._detect_local(frame, query_text)
             else:
                 raise RuntimeError("No inference method available")
     
@@ -172,7 +193,7 @@ class VisionProcessor:
         return sorted(list(set(bus_numbers)))
 
 class BusDemoManager:
-    """Simple bus demo manager"""
+    """Enhanced bus demo manager with upload capability"""
     
     def __init__(self):
         self.vision_processor = VisionProcessor()
@@ -180,6 +201,7 @@ class BusDemoManager:
         self.detection_task: Optional[asyncio.Task] = None
         self.videos_dir = Path("backend/bus_videos")
         self.videos_dir.mkdir(exist_ok=True)
+        self.current_video_id = None  # Track uploaded video
         
     async def initialize(self):
         """Initialize vision processor"""
@@ -198,11 +220,62 @@ class BusDemoManager:
         logger.info(f"Switched to {mode} inference")
         return {"message": f"Switched to {mode} inference", "mode": mode}
     
+    def set_system_prompt(self, prompt: str) -> Dict:
+        """Update the system prompt for inference"""
+        return self.vision_processor.set_system_prompt(prompt)
+    
+    def get_system_prompt(self) -> str:
+        """Get the current system prompt"""
+        return self.vision_processor.get_system_prompt()
+    
+    async def upload_video(self, video_content: bytes, filename: str) -> Dict:
+        """Upload a custom video file"""
+        try:
+            # Validate file extension
+            if not filename.lower().endswith('.mp4'):
+                return {"error": "Only MP4 files are supported"}
+            
+            # Generate unique video ID based on timestamp
+            video_id = f"custom_{int(time.time())}"
+            video_path = self.videos_dir / f"bus_video_{video_id}.mp4"
+            
+            # Save the uploaded video
+            with open(video_path, 'wb') as f:
+                f.write(video_content)
+            
+            # Validate the video can be opened
+            cap = cv2.VideoCapture(str(video_path))
+            if not cap.isOpened():
+                video_path.unlink()  # Delete invalid file
+                return {"error": "Invalid video file - cannot be processed"}
+            
+            # Get video metadata
+            fps = cap.get(cv2.CAP_PROP_FPS)
+            frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            duration = int(frame_count / fps) if fps > 0 else 0
+            cap.release()
+            
+            self.current_video_id = video_id
+            
+            logger.info(f"Uploaded custom video: {filename} -> bus_video_{video_id}.mp4 ({duration}s)")
+            
+            return {
+                "message": "Video uploaded successfully",
+                "video_id": video_id,
+                "filename": filename,
+                "duration": duration,
+                "path": str(video_path)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error uploading video: {e}")
+            return {"error": f"Failed to upload video: {str(e)}"}
+    
     def get_videos(self) -> List[Dict]:
-        """Get predefined bus videos"""
+        """Get all available bus videos (predefined + uploaded)"""
         videos = []
         # Check for bus_video_1.mp4, bus_video_2.mp4, etc.
-        for i in range(1, 6):  # Support up to 5 videos
+        for i in range(1, 6):  # Support up to 5 predefined videos
             video_file = self.videos_dir / f"bus_video_{i}.mp4"
             if video_file.exists():
                 try:
@@ -216,14 +289,38 @@ class BusDemoManager:
                         videos.append({
                             "id": str(i),
                             "name": f"Bus Video {i}",
-                            "description": f"Bus detection video - {duration}s duration",
+                            "description": f"Predefined bus detection video - {duration}s duration",
                             "duration": duration,
-                            "thumbnail": "🚌"
+                            "thumbnail": "🚌",
+                            "type": "predefined"
                         })
                 except Exception as e:
                     logger.warning(f"Could not process video {video_file}: {e}")
+        
+        # Check for uploaded custom videos
+        for video_file in self.videos_dir.glob("bus_video_custom_*.mp4"):
+            try:
+                video_id = video_file.stem.replace("bus_video_", "")
+                cap = cv2.VideoCapture(str(video_file))
+                if cap.isOpened():
+                    fps = cap.get(cv2.CAP_PROP_FPS)
+                    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                    duration = int(frame_count / fps) if fps > 0 else 0
+                    cap.release()
+                    
+                    videos.append({
+                        "id": video_id,
+                        "name": f"Custom Video",
+                        "description": f"Uploaded video - {duration}s duration",
+                        "duration": duration,
+                        "thumbnail": "📤",
+                        "type": "uploaded"
+                    })
+            except Exception as e:
+                logger.warning(f"Could not process custom video {video_file}: {e}")
+        
         return videos
-    
+
     async def start_detection(self, video_id: str) -> Dict:
         """Start processing video frames with Moondream"""
         if self.is_running:
@@ -237,13 +334,16 @@ class BusDemoManager:
         self.is_running = True
         self.detection_task = asyncio.create_task(self._process_video(str(video_path)))
         
+        # Determine video name based on type
+        video_name = f"Bus Video {video_id}" if video_id.isdigit() else "Custom Video"
+        
         await event_bus.publish(Event(
             type=EventType.BUS_DEMO,
             action="detection_started",
-            data={"video_id": video_id, "video_name": f"Bus Video {video_id}"}
+            data={"video_id": video_id, "video_name": video_name}
         ))
         
-        return {"message": f"Started detection on Bus Video {video_id}", "video_id": video_id}
+        return {"message": f"Started detection on {video_name}", "video_id": video_id}
     
     async def stop_detection(self) -> Dict:
         """Stop detection"""
@@ -341,7 +441,8 @@ class BusDemoManager:
             "cloud_available": self.vision_processor.cloud_available,
             "local_available": self.vision_processor.local_available,
             "current_mode": "cloud" if self.vision_processor.use_cloud else "local",
-            "videos_available": len(list(self.videos_dir.glob("*.mp4")))
+            "videos_available": len(list(self.videos_dir.glob("*.mp4"))),
+            "system_prompt": self.vision_processor.get_system_prompt()
         }
 
 # Global bus demo manager instance

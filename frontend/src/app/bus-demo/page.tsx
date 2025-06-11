@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useWebSocket } from '@/lib/WebSocketProvider';
 
 interface DetectionResult {
@@ -21,6 +21,7 @@ interface BusVideo {
   duration: number;
   thumbnail: string;
   url?: string;
+  type?: string;
 }
 
 export default function BusDemo() {
@@ -34,7 +35,12 @@ export default function BusDemo() {
   const [cloudAvailable, setCloudAvailable] = useState(false);
   const [localAvailable, setLocalAvailable] = useState(false);
   const [expandedFrame, setExpandedFrame] = useState<DetectionResult | null>(null);
+  const [systemPrompt, setSystemPrompt] = useState('');
+  const [isEditingPrompt, setIsEditingPrompt] = useState(false);
+  const [promptText, setPromptText] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
   
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { lastEvent } = useWebSocket();
 
   // Fetch available videos and status from backend
@@ -75,6 +81,8 @@ export default function BusDemo() {
           setCloudAvailable(statusData.cloud_available || false);
           setLocalAvailable(statusData.local_available || false);
           setUseCloud(statusData.current_mode === 'cloud');
+          setSystemPrompt(statusData.system_prompt || '');
+          setPromptText(statusData.system_prompt || '');
         }
       } catch (error) {
         console.error('Failed to fetch data:', error);
@@ -211,6 +219,75 @@ export default function BusDemo() {
     }
   };
 
+  const updateSystemPrompt = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/bus-demo/system-prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: promptText })
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        setSystemPrompt(promptText);
+        setIsEditingPrompt(false);
+        console.log('✅ System prompt updated:', result.message);
+      } else {
+        const error = await response.json();
+        alert(`Failed to update system prompt: ${error.detail}`);
+      }
+    } catch (error) {
+      console.error('Error updating system prompt:', error);
+      alert('Error updating system prompt');
+    }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.mp4')) {
+      alert('Please select an MP4 file');
+      return;
+    }
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('http://localhost:8000/bus-demo/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Video uploaded successfully:', result);
+        
+        // Refresh video list
+        const videosResponse = await fetch('http://localhost:8000/bus-demo/videos');
+        if (videosResponse.ok) {
+          const videosData = await videosResponse.json();
+          setBusVideos(videosData.videos || []);
+        }
+        
+        alert(`Video uploaded successfully! Duration: ${result.duration}s`);
+      } else {
+        const error = await response.json();
+        alert(`Failed to upload video: ${error.detail}`);
+      }
+    } catch (error) {
+      console.error('Error uploading video:', error);
+      alert('Error uploading video. Make sure the backend is running.');
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   const averageLatency = frameCount > 0 ? totalLatency / frameCount : 0;
 
   return (
@@ -231,7 +308,19 @@ export default function BusDemo() {
             <div className="xl:col-span-1 space-y-6">
               {/* Video Selection */}
               <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
-                <h2 className="text-xl font-semibold text-white mb-4">Select Bus Scenario</h2>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-semibold text-white">Select Bus Scenario</h2>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="px-3 py-1 text-sm bg-gray-600 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center space-x-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <span>{isUploading ? 'Uploading...' : 'Upload MP4'}</span>
+                  </button>
+                </div>
                 <div className="space-y-3">
                   {busVideos.length > 0 ? (
                     busVideos.map((video) => (
@@ -250,6 +339,11 @@ export default function BusDemo() {
                             <div className="font-medium">{video.name}</div>
                             <div className="text-sm opacity-75">{video.description}</div>
                             <div className="text-xs opacity-60">{video.duration}s duration</div>
+                            {video.type === 'uploaded' && (
+                              <span className="inline-block mt-1 px-2 py-0.5 text-xs bg-green-600/20 text-green-400 rounded">
+                                Custom
+                              </span>
+                            )}
                           </div>
                         </div>
                       </button>
@@ -259,11 +353,74 @@ export default function BusDemo() {
                       <div className="text-4xl mb-2">📹</div>
                       <div className="text-sm">No videos found</div>
                       <div className="text-xs mt-1">
-                        Place bus_video_1.mp4, bus_video_2.mp4, etc. in backend/bus_videos/
+                        Place bus_video_1.mp4, bus_video_2.mp4, etc. in backend/bus_videos/ or upload your own
                       </div>
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* System Prompt */}
+              <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-semibold text-white">System Prompt</h2>
+                  <button
+                    onClick={() => {
+                      setIsEditingPrompt(!isEditingPrompt);
+                      if (!isEditingPrompt) {
+                        setPromptText(systemPrompt);
+                      }
+                    }}
+                    className="px-3 py-1 text-sm bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors flex items-center space-x-1"
+                  >
+                    {isEditingPrompt ? (
+                      <>
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        <span>Cancel</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        <span>Edit</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                {isEditingPrompt ? (
+                  <div className="space-y-3">
+                    <textarea
+                      value={promptText}
+                      onChange={(e) => setPromptText(e.target.value)}
+                      className="w-full h-24 px-3 py-2 bg-gray-700/50 border border-gray-600/50 rounded-lg text-white text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Enter system prompt for Moondream..."
+                    />
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={updateSystemPrompt}
+                        className="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsEditingPrompt(false);
+                          setPromptText(systemPrompt);
+                        }}
+                        className="px-3 py-1 text-sm bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-300 bg-gray-700/30 rounded-lg p-3 max-h-24 overflow-y-auto">
+                    {systemPrompt || 'No system prompt set'}
+                  </div>
+                )}
               </div>
 
               {/* Inference Mode Toggle */}
@@ -470,6 +627,15 @@ export default function BusDemo() {
           </div>
         </div>
       </div>
+
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".mp4"
+        onChange={handleFileUpload}
+        className="hidden"
+      />
 
       {/* Expanded Frame Modal */}
       {expandedFrame && (
