@@ -7,6 +7,9 @@ class Settings(BaseSettings):
     openrouter_api_key: str
     openrouter_model: str = "qwen/qwen2.5-vl-72b-instruct:free"
 
+    # Moondream configuration
+    moondream_api_key: Optional[str] = None  # For Moondream Cloud
+    moondream_local_endpoint: str = "http://localhost:2020/v1"  # For local server
     
     # Audio configuration
     audio_sample_rate: int = 16000
@@ -30,6 +33,7 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
     cors_origins: list[str] = ["http://localhost:3000"]
+
     
     class Config:
         env_file = ".env"

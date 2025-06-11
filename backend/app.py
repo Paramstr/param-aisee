@@ -13,6 +13,7 @@ from .config import settings
 from .events import event_bus, Event, EventType
 from .core.shared import container
 from .core.conversation import conversation_storage
+from .core.bus_demo import bus_demo_manager
 
 # Configure logging
 logging.basicConfig(
@@ -29,6 +30,13 @@ async def lifespan(app: FastAPI):
     try:
         # Initialize dependency container
         await container.initialize()
+        
+        # Initialize bus demo manager
+        try:
+            await bus_demo_manager.initialize()
+            logger.info("✅ Bus demo manager initialized")
+        except Exception as e:
+            logger.warning(f"⚠️ Bus demo manager failed to initialize: {e}")
         
         # Start all background tasks
         await container.task_manager.start_all_tasks()
@@ -234,6 +242,73 @@ async def websocket_endpoint(websocket: WebSocket):
     finally:
         manager.disconnect(websocket)
 
+
+# ================== BUS DEMO ENDPOINTS ==================
+
+@app.get("/bus-demo/videos")
+async def get_bus_videos():
+    """Get available bus videos for detection"""
+    try:
+        return {"videos": bus_demo_manager.get_videos()}
+    except Exception as e:
+        logger.error(f"Error getting bus videos: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/bus-demo/start/{video_id}")
+async def start_bus_detection(video_id: str):
+    """Start bus number detection for a specific video"""
+    try:
+        result = await bus_demo_manager.start_detection(video_id)
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        return result
+    except Exception as e:
+        logger.error(f"Error starting bus detection: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/bus-demo/stop")
+async def stop_bus_detection():
+    """Stop bus number detection"""
+    try:
+        result = await bus_demo_manager.stop_detection()
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        return result
+    except Exception as e:
+        logger.error(f"Error stopping bus detection: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/bus-demo/status")
+async def get_bus_demo_status():
+    """Get bus demo status"""
+    try:
+        return bus_demo_manager.get_status()
+    except Exception as e:
+        logger.error(f"Error getting bus demo status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class InferenceModeRequest(BaseModel):
+    use_cloud: bool
+
+
+@app.post("/bus-demo/inference-mode")
+async def set_inference_mode(request: InferenceModeRequest):
+    """Switch between cloud and local inference"""
+    try:
+        result = bus_demo_manager.set_inference_mode(request.use_cloud)
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        return result
+    except Exception as e:
+        logger.error(f"Error setting inference mode: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ================== TEST ENDPOINTS ==================
 
 @app.post("/test-wake-word")
 async def test_wake_word():

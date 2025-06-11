@@ -9,7 +9,9 @@ opencv-python-headless
 pillow
 python-dotenv
 webrtcvad
+# Bus Demo Dependencies
+moondream
+
 # Removed problematic dependencies that caused memory corruption:
 # - qwen-vl-utils (PyTorch tensor memory issues)
-# - torch (not needed for CPU-only video processing)  
-# - torchvision (deprecated video capabilities with memory bugs)
+# Note: Re-adding torch/torchvision for Moondream VLM in bus demo
