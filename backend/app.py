@@ -1,6 +1,7 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import asyncio
 import logging
@@ -8,6 +9,7 @@ import uvicorn
 from contextlib import asynccontextmanager
 import sounddevice as sd
 import cv2
+from pathlib import Path
 
 from .config import settings
 from .events import event_bus, Event, EventType
@@ -289,6 +291,29 @@ async def get_bus_videos():
     except Exception as e:
         logger.error(f"Error getting bus videos: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/bus-demo/video/{video_id}")
+async def get_video_info(video_id: str):
+    """Get detailed video information"""
+    try:
+        video_path = Path("backend/bus_videos") / f"bus_video_{video_id}.mp4"
+        if not video_path.exists():
+            raise HTTPException(status_code=404, detail=f"Video {video_id} not found")
+        
+        return {
+            "id": video_id,
+            "filename": f"bus_video_{video_id}.mp4",
+            "path": str(video_path),
+            "url": f"/bus-demo/stream/{video_id}"
+        }
+    except Exception as e:
+        logger.error(f"Error getting video info: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Mount static files for video streaming
+app.mount("/bus-demo/videos", StaticFiles(directory="backend/bus_videos"), name="bus_videos")
 
 
 @app.post("/bus-demo/start/{video_id}")

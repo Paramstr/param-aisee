@@ -280,6 +280,10 @@ class BusDemoManager:
                 
                 # Process every nth frame
                 if frame_index % frame_skip == 0:
+                    # Calculate video timestamp
+                    video_timestamp_sec = frame_index / fps if fps > 0 else frame_index / 30
+                    video_timestamp_formatted = f"{int(video_timestamp_sec // 60):02d}:{int(video_timestamp_sec % 60):02d}.{int((video_timestamp_sec % 1) * 1000):03d}"
+                    
                     # Send frame to vision processor
                     result = await self.vision_processor.detect_bus_number(frame)
                     
@@ -293,7 +297,8 @@ class BusDemoManager:
                             type=EventType.BUS_DEMO,
                             action="detection_result",
                             data={
-                                "timestamp": datetime.now().strftime("%H:%M:%S.%f")[:-3],
+                                "timestamp": video_timestamp_formatted,
+                                "videoTimestamp": video_timestamp_sec,
                                 "latency": result["latency"],
                                 "busNumber": ", ".join(result["bus_numbers"]),
                                 "frameUrl": f"data:image/jpeg;base64,{frame_b64}",
