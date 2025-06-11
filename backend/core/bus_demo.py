@@ -270,7 +270,7 @@ class BusDemoManager:
                 raise RuntimeError(f"Could not open video: {video_path}")
             
             fps = cap.get(cv2.CAP_PROP_FPS)
-            frame_skip = int(fps) if fps > 0 else 30  # Process 1 frame per second
+            frame_skip = int(fps/2) if fps > 0 else 15  # Process 2 frames per second
             frame_index = 0
             
             while self.is_running:
