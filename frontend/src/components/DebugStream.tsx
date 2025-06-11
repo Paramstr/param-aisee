@@ -101,7 +101,7 @@ export function DebugStream({ lastEvent, className = '' }: DebugStreamProps) {
             <div className="w-8 h-8 bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-lg flex items-center justify-center text-sm shadow-lg">
               🔍
             </div>
-            <h2 className="text-lg font-semibold text-white">Debug Stream</h2>
+            <h2 className="text-lg font-semibold text-white">Transcription Stream</h2>
           </div>
           <button
             onClick={() => setShowDebugPanel(true)}
@@ -122,7 +122,7 @@ export function DebugStream({ lastEvent, className = '' }: DebugStreamProps) {
           <div className="w-6 h-6 bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-lg flex items-center justify-center text-xs shadow-lg">
             🔍
           </div>
-          <h2 className="text-base font-semibold text-white">Debug Stream</h2>
+          <h2 className="text-base font-semibold text-white">Transcription Stream</h2>
           <div className="flex items-center space-x-2">
             {isTranscribing.current && (
               <div className="status-indicator info">

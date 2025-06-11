@@ -562,7 +562,6 @@ No other content, punctuation, or chain-of-thought.
             import os
             
             logger.info(f"Processing video with stable CPU-only method: {video_path}")
-            logger.info(f"Replaced qwen_vl_utils to fix memory corruption issues")
             
             # Verify video file exists and is readable
             if not os.path.exists(video_path):
