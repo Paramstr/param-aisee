@@ -1,6 +1,6 @@
 'use client';
 
-import { useSocket } from '@/lib/useSocket';
+import { useWebSocket } from '@/lib/WebSocketProvider';
 import { CameraFeed } from '@/components/CameraFeed';
 import { ChatPanel } from '@/components/ChatPanel';
 import { StatusBar } from '@/components/StatusBar';
@@ -9,7 +9,7 @@ import { ToolIndicator } from '@/components/ToolIndicator';
 import { DeviceSelector } from '@/components/DeviceSelector';
 
 export function OsmoDashboard() {
-  const { isConnected, lastEvent, systemStatus, toolState, error, refreshSystemStatus } = useSocket('ws://localhost:8000/ws');
+  const { isConnected, lastEvent, systemStatus, toolState, error, refreshSystemStatus } = useWebSocket();
 
   return (
     <div className="h-full flex flex-col overflow-hidden">

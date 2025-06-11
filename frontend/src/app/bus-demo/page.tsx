@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSocket } from '@/lib/useSocket';
+import { useWebSocket } from '@/lib/WebSocketProvider';
 
 interface DetectionResult {
   id: string;
@@ -32,7 +32,7 @@ export default function BusDemo() {
   const [cloudAvailable, setCloudAvailable] = useState(false);
   const [localAvailable, setLocalAvailable] = useState(false);
   
-  const { lastEvent } = useSocket('ws://localhost:8000/ws');
+  const { lastEvent } = useWebSocket();
 
   // Fetch available videos and status from backend
   useEffect(() => {

@@ -14,6 +14,7 @@ from .events import event_bus, Event, EventType
 from .core.shared import container
 from .core.conversation import conversation_storage
 from .core.bus_demo import bus_demo_manager
+from .core.service_registry import service_registry, ServiceMode
 
 # Configure logging
 logging.basicConfig(
@@ -122,6 +123,33 @@ class CameraCaptureToggleRequest(BaseModel):
     enabled: bool
 
 
+class ServiceModeRequest(BaseModel):
+    mode: str
+
+
+@app.post("/service/mode")
+async def set_service_mode(request: ServiceModeRequest):
+    """Switch between service modes (osmo/bus_demo)"""
+    try:
+        mode = ServiceMode(request.mode)
+        await container.task_manager.switch_mode(mode)
+        return {
+            "message": f"Switched to {mode.value} mode",
+            "mode": mode.value,
+            "status": service_registry.get_status()
+        }
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid mode: {request.mode}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to switch mode: {str(e)}")
+
+
+@app.get("/service/status")
+async def get_service_status():
+    """Get current service registry status"""
+    return service_registry.get_status()
+
+
 @app.post("/voice/toggle")
 async def toggle_voice_dictation(request: VoiceDictationToggleRequest):
     """Toggle voice dictation on/off"""
@@ -175,9 +203,17 @@ class ConnectionManager:
         logger.info(f"WebSocket disconnected. Total connections: {len(self.active_connections)}")
     
     async def send_to_all(self, message: dict):
-        """Send message to all connected clients"""
+        """Send message to all connected clients with service filtering"""
         if not self.active_connections:
             return
+        
+        # Filter events based on active service mode
+        if message.get("type") == "event":
+            event_data = message.get("event", {})
+            event_type = event_data.get("type", "")
+            if not service_registry.should_process_event(event_type):
+                logger.debug(f"WebSocket event {event_type} filtered for current mode")
+                return
         
         dead_connections = []
         for connection in self.active_connections:

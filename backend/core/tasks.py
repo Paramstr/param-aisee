@@ -3,6 +3,7 @@ import logging
 from typing import Optional, Dict, Callable, Any
 
 from ..events import Event, EventType, event_bus
+from .service_registry import service_registry, ServiceMode
 
 logger = logging.getLogger(__name__)
 
@@ -75,13 +76,12 @@ class TaskManager:
         self.is_running = True
         
         try:
-            # Start all processors
-            await self.llm_processor.start()
-            await self.vision_processor.start_capture()
-            await self.audio_processor.start_listening()
-            
-            # Start event handler
+            # Start event handler first
             self.event_handler_task = asyncio.create_task(self._event_handler())
+            
+            # Default to osmo mode on startup
+            await service_registry.set_mode(ServiceMode.OSMO)
+            await self._start_active_services()
             
             logger.info("All tasks started successfully")
             await event_bus.publish(Event(
@@ -122,6 +122,45 @@ class TaskManager:
         except Exception as e:
             logger.error(f"Error stopping tasks: {e}")
     
+    async def switch_mode(self, mode: ServiceMode):
+        """Switch to a different service mode"""
+        if not self.is_running:
+            await service_registry.set_mode(mode)
+            return
+        
+        # Stop current services
+        await self._stop_active_services()
+        
+        # Switch mode
+        await service_registry.set_mode(mode)
+        
+        # Start new services
+        await self._start_active_services()
+        
+        logger.info(f"Switched to {mode.value} mode")
+    
+    async def _start_active_services(self):
+        """Start services based on current active mode"""
+        if service_registry.is_service_active("llm_processor"):
+            await self.llm_processor.start()
+        
+        if service_registry.is_service_active("vision_processor"):
+            await self.vision_processor.start_capture()
+        
+        if service_registry.is_service_active("audio_processor"):
+            await self.audio_processor.start_listening()
+    
+    async def _stop_active_services(self):
+        """Stop currently active services"""
+        if service_registry.is_service_active("audio_processor"):
+            await self.audio_processor.stop_listening()
+        
+        if service_registry.is_service_active("vision_processor"):
+            await self.vision_processor.stop_capture()
+        
+        if service_registry.is_service_active("llm_processor"):
+            await self.llm_processor.stop()
+    
     async def _event_handler(self):
         """Main event handling loop"""
         logger.info("Event handler started")
@@ -153,6 +192,11 @@ class TaskManager:
         """Process a single event using lookup table dispatch"""
         try:
             logger.debug(f"Processing event: {event.type.value}:{event.action}")
+            
+            # Filter events based on active service mode
+            if not service_registry.should_process_event(event.type.value):
+                logger.debug(f"Event {event.type.value} filtered out for current mode")
+                return
             
             # Get handlers for this event type
             type_handlers = self.event_handlers.get(event.type)
