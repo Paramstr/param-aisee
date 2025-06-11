@@ -87,11 +87,15 @@ class DependencyContainer:
             tool_registry=self._tool_registry
         )
         
+        # Import bus_demo_manager
+        from .bus_demo import bus_demo_manager
+        
         self._task_manager = TaskManager(
             audio_processor=self._audio_processor,
             vision_processor=self._vision_processor,
             llm_processor=self._llm_processor,
-            tool_registry=self._tool_registry
+            tool_registry=self._tool_registry,
+            bus_demo_manager=bus_demo_manager
         )
         
         # Initialize processors

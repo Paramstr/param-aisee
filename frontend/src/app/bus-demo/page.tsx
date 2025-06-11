@@ -64,7 +64,10 @@ export default function BusDemo() {
   useEffect(() => {
     if (!lastEvent) return;
 
+    console.log(`🚌 Bus demo received event:`, lastEvent);
+
     if (lastEvent.type === 'bus_demo') {
+      console.log(`🎯 Processing bus_demo event: ${lastEvent.action}`);
       switch (lastEvent.action) {
         case 'detection_started':
           setIsDetecting(true);
@@ -110,7 +113,12 @@ export default function BusDemo() {
   }, [lastEvent]);
 
   const startDetection = async () => {
-    if (!selectedVideo) return;
+    if (!selectedVideo) {
+      console.warn('❌ No video selected for detection');
+      return;
+    }
+    
+    console.log(`🎬 Starting detection for video: ${selectedVideo.id} (${selectedVideo.name})`);
     
     try {
       const response = await fetch(`http://localhost:8000/bus-demo/start/${selectedVideo.id}`, {
@@ -119,15 +127,15 @@ export default function BusDemo() {
       
       if (response.ok) {
         const result = await response.json();
-        console.log('Detection started:', result.message);
+        console.log('✅ Detection started:', result.message);
         // State will be updated via WebSocket events
       } else {
         const error = await response.json();
-        console.error('Failed to start detection:', error.detail);
+        console.error('❌ Failed to start detection:', error.detail);
         alert(`Failed to start detection: ${error.detail}`);
       }
     } catch (error) {
-      console.error('Error starting detection:', error);
+      console.error('❌ Error starting detection:', error);
       alert('Error starting detection. Make sure the backend is running.');
     }
   };
