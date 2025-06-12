@@ -22,6 +22,7 @@ interface BusVideo {
   thumbnail: string;
   url?: string;
   type?: string;
+  filename?: string;
 }
 
 export default function BusDemo() {
@@ -62,7 +63,8 @@ export default function BusDemo() {
                   const videoInfo = await videoInfoResponse.json();
                   return {
                     ...video,
-                    url: `http://localhost:8000${videoInfo.url}`
+                    url: `http://localhost:8000${videoInfo.url}`,
+                    filename: videoInfo.filename || video.filename
                   };
                 }
               } catch (e) {
@@ -270,8 +272,8 @@ export default function BusDemo() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!file.name.toLowerCase().endsWith('.mp4')) {
-      alert('Please select an MP4 file');
+    if (!file.name.toLowerCase().endsWith('.mp4') && !file.name.toLowerCase().endsWith('.mov')) {
+      alert('Please select an MP4 or MOV file');
       return;
     }
 
@@ -289,11 +291,33 @@ export default function BusDemo() {
         const result = await response.json();
         console.log('✅ Video uploaded successfully:', result);
         
-        // Refresh video list
+        // Refresh video list with URLs
         const videosResponse = await fetch('http://localhost:8000/object-demo/videos');
         if (videosResponse.ok) {
           const videosData = await videosResponse.json();
-          setBusVideos(videosData.videos || []);
+          const videos = videosData.videos || [];
+          
+                     // Add video URLs for each video (including the newly uploaded one)
+           const videosWithUrls = await Promise.all(
+             videos.map(async (video: BusVideo) => {
+               try {
+                 const videoInfoResponse = await fetch(`http://localhost:8000/object-demo/video/${video.id}`);
+                 if (videoInfoResponse.ok) {
+                   const videoInfo = await videoInfoResponse.json();
+                   return {
+                     ...video,
+                     url: `http://localhost:8000${videoInfo.url}`,
+                     filename: videoInfo.filename || video.filename
+                   };
+                 }
+               } catch (e) {
+                 console.warn(`Failed to get info for video ${video.id}:`, e);
+               }
+               return video;
+             })
+           );
+          
+          setBusVideos(videosWithUrls);
         }
         
         alert(`Video uploaded successfully! Duration: ${result.duration}s`);
@@ -342,7 +366,7 @@ export default function BusDemo() {
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                     </svg>
-                    <span>{isUploading ? 'Uploading...' : 'Upload MP4'}</span>
+                    <span>{isUploading ? 'Uploading...' : 'Upload Video'}</span>
                   </button>
                 </div>
                 <div className="space-y-3">
@@ -377,7 +401,7 @@ export default function BusDemo() {
                       <div className="text-4xl mb-2">📹</div>
                       <div className="text-sm">No videos found</div>
                       <div className="text-xs mt-1">
-                        Place bus_video_1.mp4, bus_video_2.mp4, etc. in backend/bus_videos/ or upload your own
+                        Place video files (.mp4 or .mov) in backend/sample_videos/ or upload your own
                       </div>
                     </div>
                   )}
@@ -440,7 +464,12 @@ export default function BusDemo() {
                   {isEditingPrompt ? (
                     <textarea
                       value={promptText}
-                      onChange={(e) => setPromptText(e.target.value)}
+                      onChange={(e) => {
+                        setPromptText(e.target.value);
+                        // Auto-resize textarea to fit content
+                        e.target.style.height = 'auto';
+                        e.target.style.height = Math.max(96, e.target.scrollHeight) + 'px'; // 96px = min-h-24
+                      }}
                       onBlur={async () => {
                         // Auto-save on blur
                         if (promptText !== systemPrompt) {
@@ -455,13 +484,19 @@ export default function BusDemo() {
                           setIsEditingPrompt(false);
                         }
                       }}
-                      className="w-full h-24 px-3 py-3 bg-gray-700/30 border border-gray-500/50 rounded-lg text-gray-300 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-gray-400 focus:bg-gray-700/40"
+                      onFocus={(e) => {
+                        // Auto-resize on focus to match content
+                        e.target.style.height = 'auto';
+                        e.target.style.height = Math.max(96, e.target.scrollHeight) + 'px';
+                      }}
+                      className="w-full min-h-24 px-3 py-3 bg-gray-700/30 border border-gray-500/50 rounded-lg text-gray-300 text-sm resize-y focus:outline-none focus:ring-1 focus:ring-gray-400 focus:bg-gray-700/40"
                       placeholder="Enter custom prompt for object detection..."
+                      style={{ overflow: 'hidden' }}
                       autoFocus
                     />
                   ) : (
                     <div 
-                      className="text-sm text-gray-300 bg-gray-700/30 rounded-lg p-3 h-24 flex items-start border border-gray-600/30 cursor-text hover:bg-gray-700/40 hover:border-gray-500/40 transition-colors"
+                      className="text-sm text-gray-300 bg-gray-700/30 rounded-lg p-3 min-h-24 flex items-start border border-gray-600/30 cursor-text hover:bg-gray-700/40 hover:border-gray-500/40 transition-colors whitespace-pre-wrap"
                       onClick={() => {
                         setPromptText(systemPrompt);
                         setIsEditingPrompt(true);
@@ -527,7 +562,7 @@ export default function BusDemo() {
                         <span>Detecting...</span>
                       </div>
                     ) : (
-                      '🔍 Watch for Bus Numbers'
+                      '🔍 Watch for Objects'
                     )}
                   </button>
                   
@@ -683,7 +718,7 @@ export default function BusDemo() {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".mp4"
+        accept=".mp4,.mov"
         onChange={handleFileUpload}
         className="hidden"
       />

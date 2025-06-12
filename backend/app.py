@@ -298,15 +298,25 @@ async def get_video_info(video_id: str):
     """Get detailed video information"""
     try:
         # video_id is actually the filename without extension
-        video_path = Path("backend/sample_videos") / f"{video_id}.mp4"
-        if not video_path.exists():
-            raise HTTPException(status_code=404, detail=f"Video {video_id} not found")
+        video_path = None
+        filename = None
+        
+        # Look for video file with either .mp4 or .mov extension
+        for ext in ['.mp4', '.mov']:
+            potential_path = Path("backend/sample_videos") / f"{video_id}{ext}"
+            if potential_path.exists():
+                video_path = potential_path
+                filename = f"{video_id}{ext}"
+                break
+        
+        if video_path is None:
+            raise HTTPException(status_code=404, detail=f"Video {video_id} not found (checked .mp4 and .mov)")
         
         return {
             "id": video_id,
-            "filename": f"{video_id}.mp4",
+            "filename": filename,
             "path": str(video_path),
-            "url": f"/object-demo/videos/{video_id}.mp4"
+            "url": f"/object-demo/videos/{filename}"
         }
     except Exception as e:
         logger.error(f"Error getting video info: {e}")
@@ -398,11 +408,11 @@ async def get_system_prompt():
 
 @app.post("/object-demo/upload")
 async def upload_video(file: UploadFile = File(...)):
-    """Upload a custom MP4 video for detection"""
+    """Upload a custom MP4 or MOV video for detection"""
     try:
         # Validate file type
-        if not file.filename or not file.filename.lower().endswith('.mp4'):
-            raise HTTPException(status_code=400, detail="Only MP4 files are supported")
+        if not file.filename or not file.filename.lower().endswith(('.mp4', '.mov')):
+            raise HTTPException(status_code=400, detail="Only MP4 and MOV files are supported")
         
         # Read file content
         video_content = await file.read()

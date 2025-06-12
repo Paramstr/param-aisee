@@ -218,12 +218,13 @@ class ObjectDetectionManager:
         """Upload a custom video file"""
         try:
             # Validate file extension
-            if not filename.lower().endswith('.mp4'):
-                return {"error": "Only MP4 files are supported"}
+            if not filename.lower().endswith(('.mp4', '.mov')):
+                return {"error": "Only MP4 and MOV files are supported"}
             
             # Use the original filename (without extension) as the video ID for simplicity
             video_id = Path(filename).stem
-            video_path = self.videos_dir / f"{video_id}.mp4"
+            file_extension = Path(filename).suffix.lower()
+            video_path = self.videos_dir / f"{video_id}{file_extension}"
             
             # Save the uploaded video
             with open(video_path, 'wb') as f:
@@ -243,7 +244,7 @@ class ObjectDetectionManager:
             
             self.current_video_id = video_id
             
-            logger.info(f"Uploaded custom video: {filename} -> {video_id}.mp4 ({duration}s)")
+            logger.info(f"Uploaded custom video: {filename} -> {video_id}{file_extension} ({duration}s)")
             
             return {
                 "message": "Video uploaded successfully",
@@ -261,36 +262,38 @@ class ObjectDetectionManager:
         """Get all available sample videos"""
         videos = []
         
-        # Check for all .mp4 files in the sample_videos directory
-        for video_file in self.videos_dir.glob("*.mp4"):
-            try:
-                cap = cv2.VideoCapture(str(video_file))
-                if cap.isOpened():
-                    fps = cap.get(cv2.CAP_PROP_FPS)
-                    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-                    duration = int(frame_count / fps) if fps > 0 else 0
-                    cap.release()
-                    
-                    # Extract video name without extension
-                    video_name = video_file.stem
-                    video_id = video_name
-                    
-                    # Use the filename as display name, cleaning it up
-                    display_name = video_name.replace("_", " ").replace("-", " ").title()
-                    thumbnail = "🎥"
-                    video_type = "sample"
-                    
-                    videos.append({
-                        "id": video_id,
-                        "name": display_name,
-                        "description": f"Object detection sample - {duration}s duration",
-                        "duration": duration,
-                        "thumbnail": thumbnail,
-                        "type": video_type,
-                        "filename": video_file.name
-                    })
-            except Exception as e:
-                logger.warning(f"Could not process video {video_file}: {e}")
+        # Check for all .mp4 and .mov files in the sample_videos directory
+        video_extensions = ["*.mp4", "*.mov"]
+        for pattern in video_extensions:
+            for video_file in self.videos_dir.glob(pattern):
+                try:
+                    cap = cv2.VideoCapture(str(video_file))
+                    if cap.isOpened():
+                        fps = cap.get(cv2.CAP_PROP_FPS)
+                        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                        duration = int(frame_count / fps) if fps > 0 else 0
+                        cap.release()
+                        
+                        # Extract video name without extension
+                        video_name = video_file.stem
+                        video_id = video_name
+                        
+                        # Use the filename as display name, cleaning it up
+                        display_name = video_name.replace("_", " ").replace("-", " ").title()
+                        thumbnail = "🎥"
+                        video_type = "sample"
+                        
+                        videos.append({
+                            "id": video_id,
+                            "name": display_name,
+                            "description": f"Object detection sample - {duration}s duration",
+                            "duration": duration,
+                            "thumbnail": thumbnail,
+                            "type": video_type,
+                            "filename": video_file.name
+                        })
+                except Exception as e:
+                    logger.warning(f"Could not process video {video_file}: {e}")
         
         # Sort videos by name for consistent ordering
         videos.sort(key=lambda x: x["name"])
@@ -302,9 +305,15 @@ class ObjectDetectionManager:
             return {"error": "Detection already running"}
         
         # Look for video file with the given ID as filename (without extension)
-        video_path = self.videos_dir / f"{video_id}.mp4"
-        if not video_path.exists():
-            return {"error": f"Video file {video_id}.mp4 not found"}
+        video_path = None
+        for ext in ['.mp4', '.mov']:
+            potential_path = self.videos_dir / f"{video_id}{ext}"
+            if potential_path.exists():
+                video_path = potential_path
+                break
+        
+        if video_path is None:
+            return {"error": f"Video file {video_id} not found (checked .mp4 and .mov)"}
         
         self.is_running = True
         self.detection_task = asyncio.create_task(self._process_video(str(video_path)))
@@ -411,12 +420,13 @@ class ObjectDetectionManager:
     
     def get_status(self) -> Dict:
         """Get demo status"""
+        video_count = len(list(self.videos_dir.glob("*.mp4"))) + len(list(self.videos_dir.glob("*.mov")))
         return {
             "is_running": self.is_running,
             "cloud_available": self.vision_processor.cloud_available,
             "local_available": self.vision_processor.local_available,
             "current_mode": "cloud" if self.vision_processor.use_cloud else "local",
-            "videos_available": len(list(self.videos_dir.glob("*.mp4"))),
+            "videos_available": video_count,
             "system_prompt": self.vision_processor.get_system_prompt()
         }
 
