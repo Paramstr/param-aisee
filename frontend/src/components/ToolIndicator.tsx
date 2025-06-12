@@ -1,5 +1,4 @@
 import { ToolState } from '@/lib/useSocket';
-import { useEffect } from 'react';
 
 interface ToolIndicatorProps {
   toolState: ToolState;
@@ -8,27 +7,7 @@ interface ToolIndicatorProps {
 
 export function ToolIndicator({ toolState, className = '' }: ToolIndicatorProps) {
   
-  // Debug logging
-  useEffect(() => {
-    console.log('🔧 ToolIndicator render:', toolState);
-    if (toolState.tool_name === 'get_video') {
-      console.log('🎥 Video tool state details:', {
-        active: toolState.active,
-        action: toolState.action,
-        duration: toolState.duration,
-        message: toolState.message,
-        shouldShowProgressBar: toolState.active && toolState.tool_name === 'get_video' && toolState.action === 'recording' && toolState.duration
-      });
-    }
-  }, [toolState]);
-
-  // Force re-render logging for debugging
-  console.log('🔧 ToolIndicator force render check:', {
-    active: toolState.active,
-    tool_name: toolState.tool_name,
-    action: toolState.action,
-    timestamp: Date.now()
-  });
+  // Debug logging removed for cleaner console output
   
   const getToolIcon = (toolName: string | null) => {
     switch (toolName) {
@@ -77,14 +56,12 @@ export function ToolIndicator({ toolState, className = '' }: ToolIndicatorProps)
 
   // Don't show indicator if no active tool or recent completion
   if (!toolState.active && !toolState.tool_name) {
-    console.log('🔧 ToolIndicator: Not showing - no active tool and no tool_name');
     return null;
   }
   
   // Show indicator for active tools or recent completions
   const shouldShow = toolState.active || toolState.tool_name;
   if (!shouldShow) {
-    console.log('🔧 ToolIndicator: Not showing - shouldShow is false');
     return null;
   }
 
