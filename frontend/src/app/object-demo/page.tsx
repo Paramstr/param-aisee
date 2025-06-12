@@ -100,7 +100,7 @@ export default function BusDemo() {
   useEffect(() => {
     if (!lastEvent) return;
 
-    console.log(`🚌 Bus demo received event:`, lastEvent);
+    console.log(`🚌 Object demo received event:`, lastEvent);
 
     if (lastEvent.type === 'object_demo') {
       console.log(`🎯 Processing object_demo event: ${lastEvent.action}`);
