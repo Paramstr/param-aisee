@@ -33,6 +33,7 @@ class LLMProcessor:
         
         # TTS state
         self.tts_process: Optional[subprocess.Popen] = None
+        self.tts_enabled = False  # Default to disabled
         
         # Circuit breaker for API calls
         self.api_failure_count = 0
@@ -182,8 +183,8 @@ class LLMProcessor:
             data={"full_response": response_text}
         ))
         
-        # Start TTS
-        if response_text.strip():
+        # Start TTS if enabled
+        if response_text.strip() and self.tts_enabled:
             await self._speak_text(response_text)
     
     def _build_messages(self, transcript: str, image_base64: Optional[str]) -> list:
@@ -515,6 +516,31 @@ No other content, punctuation, or chain-of-thought.
             logger.error(f"TTS worker error: {e}")
         finally:
             self.tts_process = None
+
+    async def set_tts_enabled(self, enabled: bool):
+        """Enable or disable TTS"""
+        if self.tts_enabled == enabled:
+            return  # No change needed
+        
+        self.tts_enabled = enabled
+        
+        # Stop any running TTS if disabling
+        if not enabled and self.tts_process:
+            self.tts_process.terminate()
+            self.tts_process = None
+        
+        # Publish TTS control event
+        await event_bus.publish(Event(
+            type=EventType.TTS_CONTROL,
+            action="tts_toggled",
+            data={"enabled": enabled}
+        ))
+        
+        logger.info(f"TTS {'enabled' if enabled else 'disabled'}")
+
+    def is_tts_enabled(self) -> bool:
+        """Check if TTS is enabled"""
+        return self.tts_enabled
 
     def _prepare_video_message_for_api_sync(self, video_path: str, duration: int, frames_recorded: int) -> dict:
         """

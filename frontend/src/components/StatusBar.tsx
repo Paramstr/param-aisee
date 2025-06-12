@@ -22,10 +22,7 @@ export function StatusBar({
 }: StatusBarProps) {
   const [isToggling, setIsToggling] = useState(false);
   const [isCameraToggling, setIsCameraToggling] = useState(false);
-
-  const getStatusColor = (status: boolean) => {
-    return status ? 'text-green-400' : 'text-gray-500';
-  };
+  const [isTtsToggling, setIsTtsToggling] = useState(false);
   
   const getStatusClasses = (status: boolean) => {
     return status 
@@ -52,8 +49,6 @@ export function StatusBar({
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || 'Failed to toggle voice dictation');
       }
-      
-      const result = await response.json();
       
       // Refresh system status to get updated state
       if (refreshSystemStatus) {
@@ -88,8 +83,6 @@ export function StatusBar({
         throw new Error(errorData.error || 'Failed to toggle camera capture');
       }
       
-      const result = await response.json();
-      
       // Refresh system status to get updated state
       if (refreshSystemStatus) {
         await refreshSystemStatus();
@@ -100,6 +93,39 @@ export function StatusBar({
       // Optionally show user-visible error message
     } finally {
       setIsCameraToggling(false);
+    }
+  };
+
+  const toggleTts = async () => {
+    if (!systemStatus || isTtsToggling) return;
+    
+    setIsTtsToggling(true);
+    try {
+      const response = await fetch('/api/tts/toggle', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          enabled: !systemStatus.tts_enabled
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to toggle TTS');
+      }
+      
+      // Refresh system status to get updated state
+      if (refreshSystemStatus) {
+        await refreshSystemStatus();
+      }
+      
+    } catch (error) {
+      console.error('Error toggling TTS:', error);
+      // Optionally show user-visible error message
+    } finally {
+      setIsTtsToggling(false);
     }
   };
   
@@ -144,6 +170,13 @@ export function StatusBar({
       'camera_control:capture_toggled': { 
         icon: lastEvent?.data?.enabled ? '📸' : '🔇', 
         text: `Camera capture ${lastEvent?.data?.enabled ? 'enabled' : 'disabled'}`, 
+        color: lastEvent?.data?.enabled ? 'text-green-400' : 'text-orange-400' 
+      },
+      
+      // TTS control events
+      'tts_control:tts_toggled': { 
+        icon: lastEvent?.data?.enabled ? '🔊' : '🔇', 
+        text: `TTS ${lastEvent?.data?.enabled ? 'enabled' : 'disabled'}`, 
         color: lastEvent?.data?.enabled ? 'text-green-400' : 'text-orange-400' 
       },
       
@@ -292,6 +325,31 @@ export function StatusBar({
                   <span className="text-xs font-medium">
                     {systemStatus.whisper_loaded ? 'Loaded' : 'Not Loaded'}
                   </span>
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-between p-2 bg-gray-800/50 rounded-lg border border-gray-700/50">
+                <span className="text-xs text-gray-300 font-medium">Text-to-Speech</span>
+                <div className="flex items-center space-x-2">
+                  <div className={getStatusClasses(systemStatus.tts_enabled)}>
+                    <span className="text-xs font-medium">
+                      {systemStatus.tts_enabled ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={toggleTts}
+                    disabled={!isConnected || isTtsToggling}
+                    className={`
+                      px-2 py-1 text-xs rounded-md font-medium transition-colors
+                      ${systemStatus.tts_enabled 
+                        ? 'bg-orange-600 hover:bg-orange-500 text-white' 
+                        : 'bg-green-600 hover:bg-green-500 text-white'
+                      }
+                      ${(!isConnected || isTtsToggling) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                    `}
+                  >
+                    {isTtsToggling ? '...' : (systemStatus.tts_enabled ? 'Disable' : 'Enable')}
+                  </button>
                 </div>
               </div>
             </div>

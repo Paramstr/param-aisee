@@ -15,6 +15,7 @@ export interface SystemStatus {
   camera_capture_enabled: boolean;
   llm_processing: boolean;
   whisper_loaded: boolean;
+  tts_enabled: boolean;
 }
 
 export interface ToolState {
@@ -173,7 +174,7 @@ export function useSocket(url: string): UseSocketReturn {
           if (systemStatus) {
             const updatedStatus = {
               ...systemStatus,
-              voice_dictation_enabled: event.data.enabled
+              voice_dictation_enabled: event.data.enabled as boolean
             };
             setSystemStatus(updatedStatus);
           }
@@ -187,7 +188,21 @@ export function useSocket(url: string): UseSocketReturn {
           if (systemStatus) {
             const updatedStatus = {
               ...systemStatus,
-              camera_capture_enabled: event.data.enabled
+              camera_capture_enabled: event.data.enabled as boolean
+            };
+            setSystemStatus(updatedStatus);
+          }
+        }
+        break;
+        
+      case 'tts_control':
+        // TTS events - refresh system status
+        if (event.action === 'tts_toggled') {
+          // Update the system status locally to reflect the change immediately
+          if (systemStatus) {
+            const updatedStatus = {
+              ...systemStatus,
+              tts_enabled: event.data.enabled as boolean
             };
             setSystemStatus(updatedStatus);
           }
@@ -216,7 +231,7 @@ export function useSocket(url: string): UseSocketReturn {
         console.log('📸 Setting photo_start state');
         setToolState({
           active: true,
-          tool_name: 'get_photo',
+          tool_name: data.tool as string || 'get_photo',
           action: 'starting',
           message: 'Preparing camera...',
         });
@@ -234,22 +249,22 @@ export function useSocket(url: string): UseSocketReturn {
         
       case 'photo_capture':
         console.log('📸 Setting photo_capture state');
-        setToolState({
+        setToolState(prev => ({
           active: true,
-          tool_name: 'get_photo',
+          tool_name: data.tool as string || prev.tool_name || 'get_photo',
           action: 'capturing',
           message: 'Capturing photo...',
-        });
+        }));
         break;
         
       case 'photo_complete':
         console.log('📸 Setting photo_complete state');
-        setToolState({
+        setToolState(prev => ({
           active: false,
-          tool_name: 'get_photo',
+          tool_name: data.tool as string || prev.tool_name || 'get_photo',
           action: 'complete',
           message: data.success ? 'Photo captured successfully' : 'Photo capture failed',
-        });
+        }));
         // Clear after 3 seconds
         setTimeout(() => {
           console.log('📸 Clearing photo state after 3s');

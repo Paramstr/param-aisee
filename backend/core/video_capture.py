@@ -104,6 +104,7 @@ class VideoRecorder:
                     type=EventType.TOOL_EVENT,
                     action="video_complete",
                     data={
+                        "tool": "get_video",
                         "duration": duration,
                         "file_size": video_result.get("file_size", 0),
                         "file_path": video_result.get("file_path", ""),
@@ -119,6 +120,7 @@ class VideoRecorder:
                     type=EventType.TOOL_EVENT,
                     action="video_complete",
                     data={
+                        "tool": "get_video",
                         "duration": duration,
                         "error": video_result.get("error"),
                         "message": f"Video recording failed: {video_result.get('error')}",
@@ -134,6 +136,7 @@ class VideoRecorder:
                 type=EventType.TOOL_EVENT,
                 action="video_complete",
                 data={
+                    "tool": "get_video",
                     "duration": duration,
                     "error": str(e),
                     "message": f"Video recording failed: {e}",

@@ -15,6 +15,7 @@ class EventType(Enum):
     TOOL_EVENT = "tool_event"             # Tool execution events
     VOICE_CONTROL = "voice_control"       # Voice dictation control events
     CAMERA_CONTROL = "camera_control"     # Camera capture control events
+    TTS_CONTROL = "tts_control"           # TTS control events
     
     # Bus Demo events
     OBJECT_DEMO = "object_demo"                 # Bus demo specific events

@@ -63,6 +63,9 @@ class TaskManager:
             EventType.CAMERA_CONTROL: {
                 "capture_toggled": self._handle_camera_capture_toggled,
             },
+            EventType.TTS_CONTROL: {
+                "tts_toggled": self._handle_tts_toggled,
+            },
             EventType.OBJECT_DEMO: {
                             "detection_started": self._handle_object_detection_started,
             "detection_result": self._handle_object_detection_result,
@@ -394,6 +397,13 @@ class TaskManager:
         status = "📸" if enabled else "🔇"
         logger.info(f"{status} Camera capture {'enabled' if enabled else 'disabled'}")
     
+    # TTS control handlers
+    async def _handle_tts_toggled(self, event: Event):
+        """Handle TTS toggle"""
+        enabled = event.data.get("enabled", False)
+        status = "🔊" if enabled else "🔇"
+        logger.info(f"{status} TTS {'enabled' if enabled else 'disabled'}")
+    
     # Error handler
     async def _handle_error(self, event: Event):
         """Handle error events"""
@@ -438,6 +448,7 @@ class TaskManager:
             "camera_capture_enabled": self.vision_processor.is_camera_capture_enabled() if self.vision_processor else False,
             "llm_processing": self.llm_processor.is_processing if self.llm_processor else False,
             "whisper_loaded": self.audio_processor.whisper_model_loaded if self.audio_processor else False,
+            "tts_enabled": self.llm_processor.is_tts_enabled() if self.llm_processor else False,
         }
 
 

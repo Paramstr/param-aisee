@@ -4,7 +4,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    const response = await fetch('http://localhost:8000/devices/update', {
+    const response = await fetch('http://localhost:8000/tts/toggle', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -13,8 +13,9 @@ export async function POST(request: NextRequest) {
     });
     
     if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
       return NextResponse.json(
-        { error: 'Failed to update device' },
+        { error: errorData.detail || 'Failed to toggle TTS' },
         { status: response.status }
       );
     }

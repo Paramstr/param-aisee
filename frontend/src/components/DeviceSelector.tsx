@@ -39,14 +39,14 @@ export function DeviceSelector({ className = '' }: DeviceSelectorProps) {
     
     try {
       // Fetch audio devices
-      const audioResponse = await fetch('/api/devices/audio');
+      const audioResponse = await fetch('/api/audio_devices');
       if (!audioResponse.ok) throw new Error('Failed to fetch audio devices');
       const audioData = await audioResponse.json();
       setAudioDevices(audioData.devices);
       setCurrentAudioDevice(audioData.current_device);
 
       // Fetch video devices
-      const videoResponse = await fetch('/api/devices/video');
+      const videoResponse = await fetch('/api/video_devices');
       if (!videoResponse.ok) throw new Error('Failed to fetch video devices');
       const videoData = await videoResponse.json();
       setVideoDevices(videoData.devices);
@@ -63,7 +63,7 @@ export function DeviceSelector({ className = '' }: DeviceSelectorProps) {
     setError(null);
     
     try {
-      const response = await fetch('/api/devices/update', {
+      const response = await fetch('/api/device_update', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

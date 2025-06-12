@@ -125,6 +125,10 @@ class CameraCaptureToggleRequest(BaseModel):
     enabled: bool
 
 
+class TtsToggleRequest(BaseModel):
+    enabled: bool
+
+
 class ServiceModeRequest(BaseModel):
     mode: str
 
@@ -168,6 +172,16 @@ async def toggle_camera_capture(request: CameraCaptureToggleRequest):
     await container.vision_processor.set_camera_capture_enabled(request.enabled)
     return {
         "message": f"Camera capture {'enabled' if request.enabled else 'disabled'}",
+        "enabled": request.enabled
+    }
+
+
+@app.post("/tts/toggle")
+async def toggle_tts(request: TtsToggleRequest):
+    """Toggle TTS (text-to-speech) on/off"""
+    await container.llm_processor.set_tts_enabled(request.enabled)
+    return {
+        "message": f"TTS {'enabled' if request.enabled else 'disabled'}",
         "enabled": request.enabled
     }
 
