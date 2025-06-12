@@ -59,6 +59,9 @@ class PhotoTool(Tool):
                 data={"tool": self.name}
             ))
             
+            # Small delay to ensure UI has time to show the photo capture state
+            await asyncio.sleep(0.5)
+            
             # Capture photo using thread pool to prevent blocking from image processing
             # Import container here to avoid circular imports
             from .shared import container

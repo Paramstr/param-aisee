@@ -227,18 +227,24 @@ export function useSocket(url: string): UseSocketReturn {
     console.log('🔧 handleToolEvent called:', { action, data });
     
     switch (action) {
-      case 'photo_start':
-        console.log('📸 Setting photo_start state');
+      case 'tool_start':
+        console.log('🔧 Tool start event for:', data.tool);
+        const toolName = data.tool as string;
+        // Skip showing UI for photo tool_start - only show photo_complete
+        if (toolName === 'get_photo') {
+          console.log('📸 Ignoring tool_start for get_photo - only showing completion');
+          break;
+        }
         setToolState({
           active: true,
-          tool_name: data.tool as string || 'get_photo',
+          tool_name: toolName,
           action: 'starting',
-          message: 'Preparing camera...',
+          message: `Starting ${toolName}...`,
         });
         // Auto-clear after 10 seconds if no completion event
         setTimeout(() => {
-          console.log('📸 Auto-clearing photo state after 10s timeout');
-          setToolState(prev => prev.active && prev.tool_name === 'get_photo' ? {
+          console.log('🔧 Auto-clearing tool state after 10s timeout');
+          setToolState(prev => prev.active && prev.tool_name === toolName ? {
             active: false,
             tool_name: null,
             action: null,
@@ -247,34 +253,34 @@ export function useSocket(url: string): UseSocketReturn {
         }, 10000);
         break;
         
+      case 'photo_start':
+        console.log('📸 Ignoring photo_start - only showing completion');
+        // Skip showing UI for photo_start - only show photo_complete
+        break;
+        
       case 'photo_capture':
-        console.log('📸 Setting photo_capture state');
-        setToolState(prev => ({
-          active: true,
-          tool_name: data.tool as string || prev.tool_name || 'get_photo',
-          action: 'capturing',
-          message: 'Capturing photo...',
-        }));
+        console.log('📸 Ignoring photo_capture - only showing completion');
+        // Skip showing UI for photo_capture - only show photo_complete
         break;
         
       case 'photo_complete':
-        console.log('📸 Setting photo_complete state');
-        setToolState(prev => ({
-          active: false,
-          tool_name: data.tool as string || prev.tool_name || 'get_photo',
+        console.log('📸 Showing photo completion');
+        setToolState({
+          active: true,
+          tool_name: 'get_photo',
           action: 'complete',
-          message: data.success ? 'Photo captured successfully' : 'Photo capture failed',
-        }));
-        // Clear after 3 seconds
+          message: 'Photo captured',  // Simple, clean message
+        });
+        // Show for 2 seconds, then clear completely
         setTimeout(() => {
-          console.log('📸 Clearing photo state after 3s');
+          console.log('📸 Clearing photo state after 2s');
           setToolState({
             active: false,
             tool_name: null,
             action: null,
             message: null,
           });
-        }, 3000);
+        }, 2000);
         break;
         
       case 'video_start':
@@ -332,6 +338,59 @@ export function useSocket(url: string): UseSocketReturn {
         // Clear after 5 seconds for errors
         setTimeout(() => {
           console.log('🎥 Clearing video error state after 5s');
+          setToolState({
+            active: false,
+            tool_name: null,
+            action: null,
+            message: null,
+          });
+        }, 5000);
+        break;
+        
+      case 'tool_complete':
+        console.log('🔧 Setting tool_complete state for:', data.tool);
+        const completedToolName = data.tool as string;
+        
+        // Don't override photo/video completion state - let specific handlers manage their own timing
+        if (completedToolName === 'get_photo') {
+          console.log('📸 Ignoring tool_complete for get_photo - letting photo_complete handle timing');
+          break;
+        }
+        if (completedToolName === 'get_video') {
+          console.log('🎥 Ignoring tool_complete for get_video - letting video_complete handle timing');
+          break;
+        }
+        
+        setToolState(prev => ({
+          active: false,
+          tool_name: prev.tool_name || completedToolName,
+          action: 'complete',
+          message: data.success ? `${completedToolName} completed successfully` : `${completedToolName} failed`,
+        }));
+        // Clear after 3 seconds
+        setTimeout(() => {
+          console.log('🔧 Clearing tool complete state after 3s');
+          setToolState({
+            active: false,
+            tool_name: null,
+            action: null,
+            message: null,
+          });
+        }, 3000);
+        break;
+        
+      case 'tool_error':
+        console.log('🔧 Setting tool_error state for:', data.tool);
+        const errorToolName = data.tool as string;
+        setToolState(prev => ({
+          active: false,
+          tool_name: prev.tool_name || errorToolName,
+          action: 'error',
+          message: data.error as string || `${errorToolName} failed`,
+        }));
+        // Clear after 5 seconds for errors
+        setTimeout(() => {
+          console.log('🔧 Clearing tool error state after 5s');
           setToolState({
             active: false,
             tool_name: null,

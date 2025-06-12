@@ -23,17 +23,17 @@ export function ToolIndicator({ toolState, className = '' }: ToolIndicatorProps)
   const getStatusColor = (action: string | null) => {
     switch (action) {
       case 'starting':
-        return 'bg-blue-500 shadow-blue-500/50';
+        return 'bg-red-400 shadow-red-400/50';
       case 'capturing':
-        return 'bg-green-500 shadow-green-500/50';
+        return 'bg-red-500 shadow-red-500/50';
       case 'recording':
         return 'bg-red-500 shadow-red-500/50 animate-pulse';
       case 'complete':
-        return 'bg-purple-500 shadow-purple-500/50';
-      case 'error':
         return 'bg-red-600 shadow-red-600/50';
+      case 'error':
+        return 'bg-red-700 shadow-red-700/50';
       default:
-        return 'bg-gray-500 shadow-gray-500/50';
+        return 'bg-red-500 shadow-red-500/50';
     }
   };
 
