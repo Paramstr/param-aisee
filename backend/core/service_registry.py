@@ -36,7 +36,7 @@ class ServiceRegistry:
             "osmo": {
                 "system_status", "audio_event", "llm_event", 
                 "tts_event", "tool_event", "voice_control", 
-                "camera_control", "error"
+                "camera_control", "tts_control", "error"
             },
             "object_demo": {
                 "system_status", "object_demo", "camera_control", "error"

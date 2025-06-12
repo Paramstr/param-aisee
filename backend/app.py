@@ -159,31 +159,40 @@ async def get_service_status():
 @app.post("/voice/toggle")
 async def toggle_voice_dictation(request: VoiceDictationToggleRequest):
     """Toggle voice dictation on/off"""
-    await container.audio_processor.set_voice_dictation_enabled(request.enabled)
-    return {
-        "message": f"Voice dictation {'enabled' if request.enabled else 'disabled'}",
-        "enabled": request.enabled
-    }
+    result = await container.task_manager.toggle_voice_dictation(request.enabled)
+    if result["success"]:
+        return {
+            "message": result["message"],
+            "enabled": result["enabled"]
+        }
+    else:
+        raise HTTPException(status_code=500, detail=result["message"])
 
 
 @app.post("/camera/toggle")
 async def toggle_camera_capture(request: CameraCaptureToggleRequest):
     """Toggle camera capture on/off"""
-    await container.vision_processor.set_camera_capture_enabled(request.enabled)
-    return {
-        "message": f"Camera capture {'enabled' if request.enabled else 'disabled'}",
-        "enabled": request.enabled
-    }
+    result = await container.task_manager.toggle_camera_capture(request.enabled)
+    if result["success"]:
+        return {
+            "message": result["message"],
+            "enabled": result["enabled"]
+        }
+    else:
+        raise HTTPException(status_code=500, detail=result["message"])
 
 
 @app.post("/tts/toggle")
 async def toggle_tts(request: TtsToggleRequest):
     """Toggle TTS (text-to-speech) on/off"""
-    await container.llm_processor.set_tts_enabled(request.enabled)
-    return {
-        "message": f"TTS {'enabled' if request.enabled else 'disabled'}",
-        "enabled": request.enabled
-    }
+    result = await container.task_manager.toggle_tts(request.enabled)
+    if result["success"]:
+        return {
+            "message": result["message"],
+            "enabled": result["enabled"]
+        }
+    else:
+        raise HTTPException(status_code=500, detail=result["message"])
 
 
 @app.post("/conversation/send")
@@ -691,40 +700,22 @@ async def update_device(request: DeviceUpdateRequest):
     """Update the selected audio or video device"""
     try:
         if request.device_type == "audio":
-            # Update audio device
-            settings.audio_device_index = request.device_id
-            
-            # Restart audio processor with new device
-            if container.audio_processor.is_listening:
-                await container.audio_processor.stop_listening()
-                await container.audio_processor.start_listening()
-            
-            await event_bus.publish(Event(
-                type=EventType.SYSTEM_STATUS,
-                action="audio_device_changed",
-                data={"device_id": request.device_id, "message": f"Audio device changed to device {request.device_id}"}
-            ))
-            
+            result = await container.task_manager.update_audio_device(request.device_id)
         elif request.device_type == "video":
-            # Update video device
-            settings.camera_index = request.device_id
-            
-            # Restart vision processor with new device
-            if container.vision_processor.is_capturing:
-                await container.vision_processor.stop_capture()
-                await container.vision_processor.start_capture()
-            
-            await event_bus.publish(Event(
-                type=EventType.SYSTEM_STATUS,
-                action="video_device_changed",
-                data={"device_id": request.device_id, "message": f"Video device changed to device {request.device_id}"}
-            ))
-            
+            result = await container.task_manager.update_video_device(request.device_id)
         else:
             raise HTTPException(status_code=400, detail="Invalid device_type. Must be 'audio' or 'video'")
         
-        return {"message": f"{request.device_type.title()} device updated successfully", "device_id": request.device_id}
+        if result["success"]:
+            return {
+                "message": result["message"],
+                "device_id": result["device_id"]
+            }
+        else:
+            raise HTTPException(status_code=500, detail=result["message"])
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error updating device: {e}")
         raise HTTPException(status_code=500, detail=str(e))

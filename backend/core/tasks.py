@@ -451,5 +451,161 @@ class TaskManager:
             "tts_enabled": self.llm_processor.is_tts_enabled() if self.llm_processor else False,
         }
 
+    # ================== CONTROL METHODS ==================
+    # These methods provide centralized control through the task manager
+    
+    async def toggle_voice_dictation(self, enabled: bool) -> Dict[str, Any]:
+        """Toggle voice dictation through task manager"""
+        try:
+            await self.audio_processor.set_voice_dictation_enabled(enabled)
+            
+            # Publish control event
+            await event_bus.publish(Event(
+                type=EventType.VOICE_CONTROL,
+                action="dictation_toggled",
+                data={"enabled": enabled, "message": f"Voice dictation {'enabled' if enabled else 'disabled'}"}
+            ))
+            
+            return {
+                "success": True,
+                "enabled": enabled,
+                "message": f"Voice dictation {'enabled' if enabled else 'disabled'}"
+            }
+        except Exception as e:
+            logger.error(f"Failed to toggle voice dictation: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "message": f"Failed to toggle voice dictation: {e}"
+            }
+    
+    async def toggle_camera_capture(self, enabled: bool) -> Dict[str, Any]:
+        """Toggle camera capture through task manager"""
+        try:
+            await self.vision_processor.set_camera_capture_enabled(enabled)
+            
+            # Publish control event
+            await event_bus.publish(Event(
+                type=EventType.CAMERA_CONTROL,
+                action="capture_toggled",
+                data={"enabled": enabled, "message": f"Camera capture {'enabled' if enabled else 'disabled'}"}
+            ))
+            
+            return {
+                "success": True,
+                "enabled": enabled,
+                "message": f"Camera capture {'enabled' if enabled else 'disabled'}"
+            }
+        except Exception as e:
+            logger.error(f"Failed to toggle camera capture: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "message": f"Failed to toggle camera capture: {e}"
+            }
+    
+    async def toggle_tts(self, enabled: bool) -> Dict[str, Any]:
+        """Toggle TTS through task manager"""
+        try:
+            await self.llm_processor.set_tts_enabled(enabled)
+            
+            # Publish control event
+            await event_bus.publish(Event(
+                type=EventType.TTS_CONTROL,
+                action="tts_toggled",
+                data={"enabled": enabled, "message": f"TTS {'enabled' if enabled else 'disabled'}"}
+            ))
+            
+            return {
+                "success": True,
+                "enabled": enabled,
+                "message": f"TTS {'enabled' if enabled else 'disabled'}"
+            }
+        except Exception as e:
+            logger.error(f"Failed to toggle TTS: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "message": f"Failed to toggle TTS: {e}"
+            }
+    
+    async def update_audio_device(self, device_id: int) -> Dict[str, Any]:
+        """Update audio device through task manager"""
+        try:
+            # Import here to avoid circular imports
+            from ..config import settings
+            
+            # Update settings
+            settings.audio_device_index = device_id
+            
+            # Restart audio processor if currently listening
+            was_listening = self.audio_processor.is_listening
+            if was_listening:
+                await self.audio_processor.stop_listening()
+                await self.audio_processor.start_listening()
+            
+            # Publish event
+            await event_bus.publish(Event(
+                type=EventType.SYSTEM_STATUS,
+                action="audio_device_changed",
+                data={
+                    "device_id": device_id,
+                    "was_listening": was_listening,
+                    "message": f"Audio device changed to device {device_id}"
+                }
+            ))
+            
+            return {
+                "success": True,
+                "device_id": device_id,
+                "message": f"Audio device updated successfully"
+            }
+        except Exception as e:
+            logger.error(f"Failed to update audio device: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "message": f"Failed to update audio device: {e}"
+            }
+    
+    async def update_video_device(self, device_id: int) -> Dict[str, Any]:
+        """Update video device through task manager"""
+        try:
+            # Import here to avoid circular imports
+            from ..config import settings
+            
+            # Update settings
+            settings.camera_index = device_id
+            
+            # Restart vision processor if currently capturing
+            was_capturing = self.vision_processor.is_capturing
+            if was_capturing:
+                await self.vision_processor.stop_capture()
+                await self.vision_processor.start_capture()
+            
+            # Publish event
+            await event_bus.publish(Event(
+                type=EventType.SYSTEM_STATUS,
+                action="video_device_changed",
+                data={
+                    "device_id": device_id,
+                    "was_capturing": was_capturing,
+                    "message": f"Video device changed to device {device_id}"
+                }
+            ))
+            
+            return {
+                "success": True,
+                "device_id": device_id,
+                "message": f"Video device updated successfully"
+            }
+        except Exception as e:
+            logger.error(f"Failed to update video device: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "message": f"Failed to update video device: {e}"
+            }
+
 
 # Remove global instance - will be handled by dependency injection
