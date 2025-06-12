@@ -44,11 +44,11 @@ Place your MP4 bus videos using this exact naming:
 
 ## 🔧 API Endpoints
 
-- `GET /bus-demo/videos` - List available videos
-- `POST /bus-demo/start/{video_id}` - Start detection  
-- `POST /bus-demo/stop` - Stop detection
-- `POST /bus-demo/inference-mode` - Switch cloud/local
-- `GET /bus-demo/status` - Check availability
+- `GET /object-demo/videos` - List available videos
+- `POST /object-demo/start/{video_id}` - Start detection  
+- `POST /object-demo/stop` - Stop detection
+- `POST /object-demo/inference-mode` - Switch cloud/local
+- `GET /object-demo/status` - Check availability
 
 ## 💡 Tips
 

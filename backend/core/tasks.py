@@ -9,13 +9,13 @@ logger = logging.getLogger(__name__)
 
 
 class TaskManager:
-    def __init__(self, audio_processor, vision_processor, llm_processor, tool_registry=None, bus_demo_manager=None):
+    def __init__(self, audio_processor, vision_processor, llm_processor, tool_registry=None, object_detection_manager=None):
         # Dependency injection - no more global imports
         self.audio_processor = audio_processor
         self.vision_processor = vision_processor
         self.llm_processor = llm_processor
         self.tool_registry = tool_registry
-        self.bus_demo_manager = bus_demo_manager
+        self.object_detection_manager = object_detection_manager
         
         self.is_running = False
         self.event_handler_task: Optional[asyncio.Task] = None
@@ -63,12 +63,12 @@ class TaskManager:
             EventType.CAMERA_CONTROL: {
                 "capture_toggled": self._handle_camera_capture_toggled,
             },
-            EventType.BUS_DEMO: {
-                "detection_started": self._handle_bus_demo_detection_started,
-                "detection_result": self._handle_bus_demo_detection_result,
-                "detection_completed": self._handle_bus_demo_detection_completed,
-                "detection_stopped": self._handle_bus_demo_detection_stopped,
-                "detection_error": self._handle_bus_demo_detection_error,
+            EventType.OBJECT_DEMO: {
+                            "detection_started": self._handle_object_detection_started,
+            "detection_result": self._handle_object_detection_result,
+            "detection_completed": self._handle_object_detection_completed,
+            "detection_stopped": self._handle_object_detection_stopped,
+            "detection_error": self._handle_object_detection_error,
             },
             EventType.ERROR: {
                 "*": self._handle_error,  # Handle all error actions
@@ -163,8 +163,8 @@ class TaskManager:
             logger.info("🎤 Starting audio processor")
             await self.audio_processor.start_listening()
         
-        if service_registry.is_service_active("bus_demo_manager") and self.bus_demo_manager:
-            logger.info("🚌 Bus demo manager is already initialized and ready")
+        if service_registry.is_service_active("object_detection_manager") and self.object_detection_manager:
+            logger.info("🎯 Object detection manager is already initialized and ready")
     
     async def _stop_active_services(self):
         """Stop currently active services"""
@@ -182,8 +182,8 @@ class TaskManager:
             logger.info("🤖 Stopping LLM processor")
             await self.llm_processor.stop()
         
-        if service_registry.is_service_active("bus_demo_manager"):
-            logger.info("🚌 Bus demo manager remains available")
+        if service_registry.is_service_active("object_detection_manager"):
+            logger.info("🎯 Object detection manager remains available")
     
     async def _event_handler(self):
         """Main event handling loop"""
@@ -401,32 +401,32 @@ class TaskManager:
         action = event.action
         logger.error(f"❌ Error [{action}]: {error_msg}")
     
-    # Bus demo event handlers
-    async def _handle_bus_demo_detection_started(self, event: Event):
-        """Handle bus detection started"""
+    # Object detection event handlers
+    async def _handle_object_detection_started(self, event: Event):
+        """Handle object detection started"""
         video_id = event.data.get("video_id", "unknown")
-        logger.info(f"🚌 Bus detection started for video: {video_id}")
+        logger.info(f"🎯 Object detection started for video: {video_id}")
     
-    async def _handle_bus_demo_detection_result(self, event: Event):
-        """Handle bus detection result"""
-        bus_number = event.data.get("bus_number", "none")
+    async def _handle_object_detection_result(self, event: Event):
+        """Handle object detection result"""
+        detected_objects = event.data.get("detectedObjects", "none")
         latency = event.data.get("latency", 0)
-        logger.info(f"🎯 Bus detected: {bus_number} (latency: {latency:.2f}ms)")
+        logger.info(f"🎯 Objects detected: {detected_objects} (latency: {latency:.2f}ms)")
     
-    async def _handle_bus_demo_detection_completed(self, event: Event):
-        """Handle bus detection completed"""
+    async def _handle_object_detection_completed(self, event: Event):
+        """Handle object detection completed"""
         total_frames = event.data.get("total_frames", 0)
         avg_latency = event.data.get("avg_latency", 0)
-        logger.info(f"✅ Bus detection completed: {total_frames} frames, avg latency: {avg_latency:.2f}ms")
+        logger.info(f"✅ Object detection completed: {total_frames} frames, avg latency: {avg_latency:.2f}ms")
     
-    async def _handle_bus_demo_detection_stopped(self, event: Event):
-        """Handle bus detection stopped"""
-        logger.info("🛑 Bus detection stopped")
+    async def _handle_object_detection_stopped(self, event: Event):
+        """Handle object detection stopped"""
+        logger.info("🛑 Object detection stopped")
     
-    async def _handle_bus_demo_detection_error(self, event: Event):
-        """Handle bus detection error"""
+    async def _handle_object_detection_error(self, event: Event):
+        """Handle object detection error"""
         error_msg = event.data.get("error", "Unknown error")
-        logger.error(f"❌ Bus detection error: {error_msg}")
+        logger.error(f"❌ Object detection error: {error_msg}")
     
     async def get_system_status(self) -> Dict[str, Any]:
         """Get system status"""

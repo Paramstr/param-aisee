@@ -8,7 +8,7 @@ export function Header() {
 
   const tabs = [
     { href: '/', label: 'Osmo', icon: '🤖', subtitle: 'AI Assistant' },
-    { href: '/bus-demo', label: 'Bus Demo', icon: '🚌', subtitle: 'Transportation' },
+    { href: '/object-demo', label: 'Bus Demo', icon: '🚌', subtitle: 'Transportation' },
   ];
 
   return (
@@ -18,7 +18,7 @@ export function Header() {
           <div className="flex items-center space-x-3 bg-gray-800/50 backdrop-blur-sm rounded-xl p-2 border border-gray-700/50 shadow-2xl">
             {tabs.map((tab) => {
               const isActive = pathname === tab.href;
-              const isBusDemo = tab.href === '/bus-demo';
+              const isBusDemo = tab.href === '/object-demo';
               
               // Different gradients for different tabs - less intense yellow
               const activeGradient = isBusDemo 

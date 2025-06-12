@@ -48,7 +48,7 @@ export default function BusDemo() {
     const fetchData = async () => {
       try {
         // Fetch videos
-        const videosResponse = await fetch('http://localhost:8000/bus-demo/videos');
+        const videosResponse = await fetch('http://localhost:8000/object-demo/videos');
         if (videosResponse.ok) {
           const videosData = await videosResponse.json();
           const videos = videosData.videos || [];
@@ -57,11 +57,12 @@ export default function BusDemo() {
           const videosWithUrls = await Promise.all(
             videos.map(async (video: BusVideo) => {
               try {
-                const videoInfoResponse = await fetch(`http://localhost:8000/bus-demo/video/${video.id}`);
+                const videoInfoResponse = await fetch(`http://localhost:8000/object-demo/video/${video.id}`);
                 if (videoInfoResponse.ok) {
+                  const videoInfo = await videoInfoResponse.json();
                   return {
                     ...video,
-                    url: `http://localhost:8000/bus-demo/videos/bus_video_${video.id}.mp4`
+                    url: `http://localhost:8000${videoInfo.url}`
                   };
                 }
               } catch (e) {
@@ -75,7 +76,7 @@ export default function BusDemo() {
         }
         
         // Fetch status
-        const statusResponse = await fetch('http://localhost:8000/bus-demo/status');
+        const statusResponse = await fetch('http://localhost:8000/object-demo/status');
         if (statusResponse.ok) {
           const statusData = await statusResponse.json();
           setCloudAvailable(statusData.cloud_available || false);
@@ -97,8 +98,8 @@ export default function BusDemo() {
 
     console.log(`🚌 Bus demo received event:`, lastEvent);
 
-    if (lastEvent.type === 'bus_demo') {
-      console.log(`🎯 Processing bus_demo event: ${lastEvent.action}`);
+    if (lastEvent.type === 'object_demo') {
+      console.log(`🎯 Processing object_demo event: ${lastEvent.action}`);
       switch (lastEvent.action) {
         case 'detection_started':
           setIsDetecting(true);
@@ -113,7 +114,7 @@ export default function BusDemo() {
             videoTimestamp?: number;
             latency: number;
             frameUrl: string;
-            busNumber: string;
+            detectedObjects: string;
             frameIndex: number;
           };
           const newResult: DetectionResult = {
@@ -122,7 +123,7 @@ export default function BusDemo() {
             videoTimestamp: result.videoTimestamp,
             latency: result.latency || 0,
             frameUrl: result.frameUrl || '',
-            busNumber: result.busNumber || '',
+            busNumber: result.detectedObjects || '',
             confidence: 0.85, // Default confidence
             frameIndex: result.frameIndex || 0
           };
@@ -154,7 +155,7 @@ export default function BusDemo() {
     console.log(`🎬 Starting detection for video: ${selectedVideo.id} (${selectedVideo.name})`);
     
     try {
-      const response = await fetch(`http://localhost:8000/bus-demo/start/${selectedVideo.id}`, {
+      const response = await fetch(`http://localhost:8000/object-demo/start/${selectedVideo.id}`, {
         method: 'POST'
       });
       
@@ -175,7 +176,7 @@ export default function BusDemo() {
 
   const stopDetection = async () => {
     try {
-      const response = await fetch('http://localhost:8000/bus-demo/stop', {
+      const response = await fetch('http://localhost:8000/object-demo/stop', {
         method: 'POST'
       });
       
@@ -200,7 +201,7 @@ export default function BusDemo() {
   const toggleInferenceMode = async () => {
     const newMode = !useCloud;
     try {
-      const response = await fetch('http://localhost:8000/bus-demo/inference-mode', {
+      const response = await fetch('http://localhost:8000/object-demo/inference-mode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ use_cloud: newMode })
@@ -221,7 +222,7 @@ export default function BusDemo() {
 
   const updateSystemPrompt = async () => {
     try {
-      const response = await fetch('http://localhost:8000/bus-demo/system-prompt', {
+      const response = await fetch('http://localhost:8000/object-demo/system-prompt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: promptText })
@@ -231,6 +232,29 @@ export default function BusDemo() {
         const result = await response.json();
         setSystemPrompt(promptText);
         setIsEditingPrompt(false);
+        console.log('✅ System prompt updated:', result.message);
+      } else {
+        const error = await response.json();
+        alert(`Failed to update system prompt: ${error.detail}`);
+      }
+    } catch (error) {
+      console.error('Error updating system prompt:', error);
+      alert('Error updating system prompt');
+    }
+  };
+
+  const updateSystemPromptWithText = async (prompt: string) => {
+    try {
+      const response = await fetch('http://localhost:8000/object-demo/system-prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt })
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        setSystemPrompt(prompt);
+        setPromptText(prompt);
         console.log('✅ System prompt updated:', result.message);
       } else {
         const error = await response.json();
@@ -256,7 +280,7 @@ export default function BusDemo() {
     formData.append('file', file);
 
     try {
-      const response = await fetch('http://localhost:8000/bus-demo/upload', {
+      const response = await fetch('http://localhost:8000/object-demo/upload', {
         method: 'POST',
         body: formData
       });
@@ -266,7 +290,7 @@ export default function BusDemo() {
         console.log('✅ Video uploaded successfully:', result);
         
         // Refresh video list
-        const videosResponse = await fetch('http://localhost:8000/bus-demo/videos');
+        const videosResponse = await fetch('http://localhost:8000/object-demo/videos');
         if (videosResponse.ok) {
           const videosData = await videosResponse.json();
           setBusVideos(videosData.videos || []);
@@ -297,9 +321,9 @@ export default function BusDemo() {
           {/* Header */}
           <div className="text-center mb-8">
             <div className="text-6xl mb-4">🚌</div>
-            <h1 className="text-4xl font-bold text-white mb-2">Bus Number Detection Demo</h1>
+            <h1 className="text-4xl font-bold text-white mb-2">Object Detection Demo</h1>
             <p className="text-gray-400 text-lg">
-              Simulate bus detection using Moondream VLM with latency measurements
+              Simulate realtime object detection using Moondream VLM with latency measurements
             </p>
           </div>
 
@@ -309,7 +333,7 @@ export default function BusDemo() {
               {/* Video Selection */}
               <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-semibold text-white">Select Bus Scenario</h2>
+                  <h2 className="text-xl font-semibold text-white">Select Scenario</h2>
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploading}
@@ -362,65 +386,92 @@ export default function BusDemo() {
 
               {/* System Prompt */}
               <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-semibold text-white">System Prompt</h2>
-                  <button
-                    onClick={() => {
-                      setIsEditingPrompt(!isEditingPrompt);
-                      if (!isEditingPrompt) {
-                        setPromptText(systemPrompt);
-                      }
-                    }}
-                    className="px-3 py-1 text-sm bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors flex items-center space-x-1"
-                  >
-                    {isEditingPrompt ? (
-                      <>
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                        <span>Cancel</span>
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                        <span>Edit</span>
-                      </>
-                    )}
-                  </button>
+                <div className="mb-4">
+                  <h2 className="text-xl font-semibold text-white">Detection Prompt</h2>
                 </div>
-                {isEditingPrompt ? (
-                  <div className="space-y-3">
+
+                {/* Preset Prompts */}
+                <div className="mb-4">
+                  <h3 className="text-sm font-medium text-gray-400 mb-2">Quick Presets:</h3>
+                  <div className="grid grid-cols-1 gap-2">
+                    <button
+                      onClick={() => {
+                        const busPrompt = "Identify any bus numbers visible and return only the bus number you can see. If no bus numbers are visible, respond with 'Null'.";
+                        setPromptText(busPrompt);
+                        updateSystemPromptWithText(busPrompt);
+                      }}
+                      className={`px-3 py-2 text-sm text-left rounded-lg border transition-colors ${
+                        systemPrompt.includes('bus number') 
+                          ? 'bg-blue-600/20 border-blue-500/50 text-blue-300' 
+                          : 'bg-gray-700/30 border-gray-600/50 text-gray-300 hover:bg-gray-600/30'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <span>🚌</span>
+                        <span className="font-medium">Finding Bus Number</span>
+                      </div>
+                      <div className="text-xs opacity-75 mt-1">Detect bus numbers in traffic scenes</div>
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        const airpodPrompt = "Look at this image and identify if there are any AirPods or earbuds on a table or surface. Return 'AirPods detected' if you see them, or 'Null";
+                        setPromptText(airpodPrompt);
+                        updateSystemPromptWithText(airpodPrompt);
+                      }}
+                      className={`px-3 py-2 text-sm text-left rounded-lg border transition-colors ${
+                        systemPrompt.includes('AirPods') 
+                          ? 'bg-blue-600/20 border-blue-500/50 text-blue-300' 
+                          : 'bg-gray-700/30 border-gray-600/50 text-gray-300 hover:bg-gray-600/30'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <span>🎧</span>
+                        <span className="font-medium">Finding AirPods on Table</span>
+                      </div>
+                      <div className="text-xs opacity-75 mt-1">Detect AirPods on tables or surfaces</div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Active Prompt Display */}
+                <div className="mb-4">
+                  <h3 className="text-sm font-medium text-gray-400 mb-2">Active Prompt:</h3>
+                  {isEditingPrompt ? (
                     <textarea
                       value={promptText}
                       onChange={(e) => setPromptText(e.target.value)}
-                      className="w-full h-24 px-3 py-2 bg-gray-700/50 border border-gray-600/50 rounded-lg text-white text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Enter system prompt for Moondream..."
-                    />
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={updateSystemPrompt}
-                        className="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
-                      >
-                        Save
-                      </button>
-                      <button
-                        onClick={() => {
+                      onBlur={async () => {
+                        // Auto-save on blur
+                        if (promptText !== systemPrompt) {
+                          await updateSystemPrompt();
+                        } else {
                           setIsEditingPrompt(false);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') {
                           setPromptText(systemPrompt);
-                        }}
-                        className="px-3 py-1 text-sm bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
-                      >
-                        Cancel
-                      </button>
+                          setIsEditingPrompt(false);
+                        }
+                      }}
+                      className="w-full h-24 px-3 py-3 bg-gray-700/30 border border-gray-500/50 rounded-lg text-gray-300 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-gray-400 focus:bg-gray-700/40"
+                      placeholder="Enter custom prompt for object detection..."
+                      autoFocus
+                    />
+                  ) : (
+                    <div 
+                      className="text-sm text-gray-300 bg-gray-700/30 rounded-lg p-3 h-24 flex items-start border border-gray-600/30 cursor-text hover:bg-gray-700/40 hover:border-gray-500/40 transition-colors"
+                      onClick={() => {
+                        setPromptText(systemPrompt);
+                        setIsEditingPrompt(true);
+                      }}
+                      title="Click to edit prompt"
+                    >
+                      {systemPrompt || 'Click to set detection prompt...'}
                     </div>
-                  </div>
-                ) : (
-                  <div className="text-sm text-gray-300 bg-gray-700/30 rounded-lg p-3 max-h-24 overflow-y-auto">
-                    {systemPrompt || 'No system prompt set'}
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
               {/* Inference Mode Toggle */}
@@ -541,7 +592,7 @@ export default function BusDemo() {
                   ) : (
                     <div className="text-center text-gray-500">
                       <div className="text-4xl mb-2">📹</div>
-                      <div>Select a bus scenario to begin</div>
+                      <div>Select a scenario to begin</div>
                     </div>
                   )}
                 </div>
@@ -558,7 +609,7 @@ export default function BusDemo() {
                       <thead className="bg-gray-700/30">
                         <tr>
                           <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Timestamp</th>
-                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Bus Number</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Detected Objects</th>
                           <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Latency</th>
                           <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Frame</th>
                           <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Confidence</th>
@@ -618,7 +669,7 @@ export default function BusDemo() {
                     <div className="p-8 text-center text-gray-500">
                       <div className="text-4xl mb-4">🔍</div>
                       <div className="text-lg mb-2">No detections yet</div>
-                      <div className="text-sm">Start detection to see bus numbers identified by Moondream</div>
+                      <div className="text-sm">Start detection to see objects identified by Moondream</div>
                     </div>
                   )}
                 </div>

@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 class ServiceMode(Enum):
     OSMO = "osmo"
-    BUS_DEMO = "bus_demo"
+    OBJECT_DEMO = "object_demo"
 
 class ServiceRegistry:
     """Manages which services are active based on current mode"""
@@ -21,8 +21,8 @@ class ServiceRegistry:
                 "llm_processor",
                 "tool_registry"
             },
-            "bus_demo": {
-                "bus_demo_manager"
+            "object_demo": {
+                "object_detection_manager"
             }
         }
         
@@ -37,8 +37,8 @@ class ServiceRegistry:
                 "tts_event", "tool_event", "voice_control", 
                 "camera_control", "error"
             },
-            "bus_demo": {
-                "system_status", "bus_demo", "error"
+            "object_demo": {
+                "system_status", "object_demo", "error"
             }
         }
     

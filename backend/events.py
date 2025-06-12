@@ -17,7 +17,7 @@ class EventType(Enum):
     CAMERA_CONTROL = "camera_control"     # Camera capture control events
     
     # Bus Demo events
-    BUS_DEMO = "bus_demo"                 # Bus demo specific events
+    OBJECT_DEMO = "object_demo"                 # Bus demo specific events
     
     ERROR = "error"                       
 

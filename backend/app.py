@@ -15,7 +15,7 @@ from .config import settings
 from .events import event_bus, Event, EventType
 from .core.shared import container
 from .core.conversation import conversation_storage
-from .core.bus_demo import bus_demo_manager
+from .core.object_demo import object_detection_manager
 from .core.service_registry import service_registry, ServiceMode
 
 # Configure logging
@@ -36,10 +36,10 @@ async def lifespan(app: FastAPI):
         
         # Initialize bus demo manager
         try:
-            await bus_demo_manager.initialize()
-            logger.info("✅ Bus demo manager initialized")
+            await object_detection_manager.initialize()
+            logger.info("✅ Object detection manager initialized")
         except Exception as e:
-            logger.warning(f"⚠️ Bus demo manager failed to initialize: {e}")
+            logger.warning(f"⚠️ Object detection manager failed to initialize: {e}")
         
         # Start all background tasks
         await container.task_manager.start_all_tasks()
@@ -131,7 +131,7 @@ class ServiceModeRequest(BaseModel):
 
 @app.post("/service/mode")
 async def set_service_mode(request: ServiceModeRequest):
-    """Switch between service modes (osmo/bus_demo)"""
+    """Switch between service modes (osmo/object_detection)"""
     try:
         mode = ServiceMode(request.mode)
         await container.task_manager.switch_mode(mode)
@@ -283,29 +283,30 @@ async def websocket_endpoint(websocket: WebSocket):
 
 # ================== BUS DEMO ENDPOINTS ==================
 
-@app.get("/bus-demo/videos")
-async def get_bus_videos():
-    """Get available bus videos for detection"""
+@app.get("/object-demo/videos")
+async def get_sample_videos():
+    """Get available sample videos for object detection"""
     try:
-        return {"videos": bus_demo_manager.get_videos()}
+        return {"videos": object_detection_manager.get_videos()}
     except Exception as e:
-        logger.error(f"Error getting bus videos: {e}")
+        logger.error(f"Error getting sample videos: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/bus-demo/video/{video_id}")
+@app.get("/object-demo/video/{video_id}")
 async def get_video_info(video_id: str):
     """Get detailed video information"""
     try:
-        video_path = Path("backend/bus_videos") / f"bus_video_{video_id}.mp4"
+        # video_id is actually the filename without extension
+        video_path = Path("backend/sample_videos") / f"{video_id}.mp4"
         if not video_path.exists():
             raise HTTPException(status_code=404, detail=f"Video {video_id} not found")
         
         return {
             "id": video_id,
-            "filename": f"bus_video_{video_id}.mp4",
+            "filename": f"{video_id}.mp4",
             "path": str(video_path),
-            "url": f"/bus-demo/stream/{video_id}"
+            "url": f"/object-demo/videos/{video_id}.mp4"
         }
     except Exception as e:
         logger.error(f"Error getting video info: {e}")
@@ -313,42 +314,42 @@ async def get_video_info(video_id: str):
 
 
 # Mount static files for video streaming
-app.mount("/bus-demo/videos", StaticFiles(directory="backend/bus_videos"), name="bus_videos")
+app.mount("/object-demo/videos", StaticFiles(directory="backend/sample_videos"), name="sample_videos")
 
 
-@app.post("/bus-demo/start/{video_id}")
-async def start_bus_detection(video_id: str):
-    """Start bus number detection for a specific video"""
+@app.post("/object-demo/start/{video_id}")
+async def start_object_detection(video_id: str):
+    """Start object detection for a specific video"""
     try:
-        result = await bus_demo_manager.start_detection(video_id)
+        result = await object_detection_manager.start_detection(video_id)
         if "error" in result:
             raise HTTPException(status_code=400, detail=result["error"])
         return result
     except Exception as e:
-        logger.error(f"Error starting bus detection: {e}")
+        logger.error(f"Error starting object detection: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/bus-demo/stop")
-async def stop_bus_detection():
-    """Stop bus number detection"""
+@app.post("/object-demo/stop")
+async def stop_object_detection():
+    """Stop object detection"""
     try:
-        result = await bus_demo_manager.stop_detection()
+        result = await object_detection_manager.stop_detection()
         if "error" in result:
             raise HTTPException(status_code=400, detail=result["error"])
         return result
     except Exception as e:
-        logger.error(f"Error stopping bus detection: {e}")
+        logger.error(f"Error stopping object detection: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/bus-demo/status")
-async def get_bus_demo_status():
-    """Get bus demo status"""
+@app.get("/object-demo/status")
+async def get_object_detection_status():
+    """Get object detection status"""
     try:
-        return bus_demo_manager.get_status()
+        return object_detection_manager.get_status()
     except Exception as e:
-        logger.error(f"Error getting bus demo status: {e}")
+        logger.error(f"Error getting object detection status: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -356,11 +357,11 @@ class InferenceModeRequest(BaseModel):
     use_cloud: bool
 
 
-@app.post("/bus-demo/inference-mode")
+@app.post("/object-demo/inference-mode")
 async def set_inference_mode(request: InferenceModeRequest):
     """Switch between cloud and local inference"""
     try:
-        result = bus_demo_manager.set_inference_mode(request.use_cloud)
+        result = object_detection_manager.set_inference_mode(request.use_cloud)
         if "error" in result:
             raise HTTPException(status_code=400, detail=result["error"])
         return result
@@ -373,29 +374,29 @@ class SystemPromptRequest(BaseModel):
     prompt: str
 
 
-@app.post("/bus-demo/system-prompt")
+@app.post("/object-demo/system-prompt")
 async def set_system_prompt(request: SystemPromptRequest):
     """Update the system prompt for inference"""
     try:
-        result = bus_demo_manager.set_system_prompt(request.prompt)
+        result = object_detection_manager.set_system_prompt(request.prompt)
         return result
     except Exception as e:
         logger.error(f"Error setting system prompt: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/bus-demo/system-prompt")
+@app.get("/object-demo/system-prompt")
 async def get_system_prompt():
     """Get the current system prompt"""
     try:
-        prompt = bus_demo_manager.get_system_prompt()
+        prompt = object_detection_manager.get_system_prompt()
         return {"prompt": prompt}
     except Exception as e:
         logger.error(f"Error getting system prompt: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/bus-demo/upload")
+@app.post("/object-demo/upload")
 async def upload_video(file: UploadFile = File(...)):
     """Upload a custom MP4 video for detection"""
     try:
@@ -406,8 +407,8 @@ async def upload_video(file: UploadFile = File(...)):
         # Read file content
         video_content = await file.read()
         
-        # Upload via bus demo manager
-        result = await bus_demo_manager.upload_video(video_content, file.filename)
+        # Upload via object detection manager
+        result = await object_detection_manager.upload_video(video_content, file.filename)
         
         if "error" in result:
             raise HTTPException(status_code=400, detail=result["error"])
