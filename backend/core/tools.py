@@ -46,8 +46,12 @@ class PhotoTool(Tool):
     def description(self) -> str:
         return "<get_photo/>                     → capture one still image"
     
+    def _capture_photo_sync(self) -> Optional[str]:
+        """Synchronous photo capture for thread pool execution"""
+        return self.vision_processor.capture_frame_for_llm()
+    
     async def execute(self, **kwargs) -> Dict[str, Any]:
-        """Capture a single photo"""
+        """Capture a single photo using thread pool to prevent blocking"""
         try:
             await event_bus.publish(Event(
                 type=EventType.TOOL_EVENT,
@@ -55,8 +59,20 @@ class PhotoTool(Tool):
                 data={"tool": self.name}
             ))
             
-            # Capture photo using vision processor
-            photo_base64 = self.vision_processor.capture_frame_for_llm()
+            # Capture photo using thread pool to prevent blocking from image processing
+            # Import container here to avoid circular imports
+            from .shared import container
+            
+            if container.shared and container.shared.cpu_pool:
+                loop = asyncio.get_event_loop()
+                photo_base64 = await loop.run_in_executor(
+                    container.shared.cpu_pool,
+                    self._capture_photo_sync
+                )
+            else:
+                # Fallback to direct execution if no thread pool (should not happen)
+                logger.warning("No CPU thread pool available, falling back to direct photo capture")
+                photo_base64 = self._capture_photo_sync()
             
             if photo_base64 is None:
                 raise Exception("Failed to capture photo - no camera frame available")

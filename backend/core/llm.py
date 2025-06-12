@@ -84,7 +84,7 @@ class LLMProcessor:
                 }
             ))
             
-            # Call LLM API for initial response
+            # Call LLM API for initial response (now in IO thread pool)
             initial_response = ""
             async for chunk in self._call_llm_api(messages):
                 initial_response += chunk
@@ -108,7 +108,7 @@ class LLMProcessor:
                     tool_name = tool_call["tool"]
                     tool_args = tool_call["args"]
                     
-                    # Execute the tool
+                    # Execute the tool (tools are already async)
                     result = await self.tool_registry.execute_tool(tool_name, **tool_args)
                     tool_results.append({
                         "tool": tool_name,
@@ -144,12 +144,12 @@ class LLMProcessor:
                                        tool_results: list, vision_processor=None):
         """Process query with tool results"""
         try:
-            # Build messages with tool results
-            messages = self._build_messages_with_tools(
+            # Build messages with tool results (video processing now in CPU pool)
+            messages = await self._build_messages_with_tools(
                 transcript, initial_response, tool_results, vision_processor
             )
             
-            # Call LLM API again with tool results
+            # Call LLM API again with tool results (now in IO thread pool)
             final_response = ""
             async for chunk in self._call_llm_api(messages):
                 final_response += chunk
@@ -279,38 +279,31 @@ No other content, punctuation, or chain-of-thought.
         
         return messages
     
-    def _build_messages_with_tools(self, transcript: str, initial_response: str, 
+    async def _build_messages_with_tools(self, transcript: str, initial_response: str, 
                                  tool_results: list, vision_processor=None) -> list:
-        """Build messages including tool execution results"""
-        # Start with basic messages (no auto image)
+        """Build the messages array with tool results for the OpenAI API"""
         messages = self._build_messages(transcript, None)
         
-        # Add the initial assistant response
+        # Add the initial LLM response (with tool calls)
         messages.append({
             "role": "assistant",
             "content": initial_response
         })
         
-        # Add tool results as user messages
+        # Process each tool result
         for tool_result in tool_results:
             tool_name = tool_result["tool"]
             result = tool_result["result"]
             
-            # Debug logging for tool results
-            logger.info(f"Processing tool result for {tool_name}")
-            logger.info(f"Tool result keys: {list(result.keys())}")
-            logger.info(f"Tool result success: {result.get('success', False)}")
-            
-            if result["success"]:
-                if tool_name == "get_photo" and "photo_base64" in result:
-                    # Add photo result
-                    logger.info(f"Adding photo result to messages")
+            # Handle different tool types
+            if tool_name == "get_photo":
+                if result.get("success") and result.get("photo_base64"):
                     messages.append({
                         "role": "user",
                         "content": [
                             {
                                 "type": "text",
-                                "text": f"Tool result: Photo captured successfully. Here's the photo:"
+                                "text": f"Photo captured successfully."
                             },
                             {
                                 "type": "image_url",
@@ -320,53 +313,37 @@ No other content, punctuation, or chain-of-thought.
                             }
                         ]
                     })
-                elif tool_name == "get_video" and "file_path" in result:
-                    # Use official qwen_vl_utils for proper video processing 
-                    video_path = result.get('file_path', '')
-                    video_duration = result.get('duration', 0)
-                    frames_recorded = result.get('frames_recorded', 0)
+                else:
+                    messages.append({
+                        "role": "user", 
+                        "content": f"Photo capture failed: {result.get('error', 'Unknown error')}"
+                    })
                     
-                    logger.info(f"Processing video: {video_path}")
-                    logger.info(f"Video duration: {video_duration}s, frames: {frames_recorded}")
-                    
-                    # Use the new qwen_vl_utils based method
-                    video_message = self._prepare_video_message_for_api(
-                        video_path, video_duration, frames_recorded
+            elif tool_name == "get_video":
+                if result.get("success") and result.get("video_base64"):
+                    # Process video for API in CPU thread pool
+                    video_message = await self._prepare_video_message_for_api(
+                        result.get("file_path"),
+                        result.get("duration", 0),
+                        result.get("frames_recorded", 0)
                     )
                     messages.append(video_message)
                 else:
-                    logger.info(f"Adding text-only tool result")
                     messages.append({
                         "role": "user",
-                        "content": f"Tool result: {result.get('message', 'Tool executed successfully')}"
+                        "content": f"Video recording failed: {result.get('error', 'Unknown error')}"
                     })
             else:
-                logger.info(f"Tool failed, adding error message")
+                # Generic tool result
                 messages.append({
                     "role": "user",
-                    "content": f"Tool error: {result.get('error', 'Tool execution failed')}"
+                    "content": f"Tool '{tool_name}' result: {json.dumps(result, indent=2)}"
                 })
-        
-        # Add instruction for final response
-        messages.append({
-            "role": "user",
-            "content": "Please analyze the results from the tools above and provide your response."
-        })
-        
-        # Debug final messages structure
-        logger.info(f"Final messages count: {len(messages)}")
-        for i, msg in enumerate(messages):
-            if isinstance(msg.get('content'), list):
-                logger.info(f"Message {i} ({msg['role']}): multi-content with {len(msg['content'])} parts")
-                for j, part in enumerate(msg['content']):
-                    logger.info(f"  Part {j}: type={part.get('type', 'unknown')}")
-            else:
-                logger.info(f"Message {i} ({msg['role']}): text content")
         
         return messages
     
     async def _call_llm_api(self, messages: list) -> AsyncGenerator[str, None]:
-        """Call OpenRouter API using OpenAI client and stream response with timeout and circuit breaker"""
+        """Call OpenRouter API using AsyncOpenAI client and stream response with timeout and circuit breaker"""
         if not self.client:
             raise Exception("LLM client not initialized")
         
@@ -419,15 +396,15 @@ No other content, punctuation, or chain-of-thought.
             try:
                 stream = await asyncio.wait_for(
                     self.client.chat.completions.create(
-                model=settings.openrouter_model,
-                messages=messages,
-                max_tokens=settings.max_tokens,
-                temperature=settings.temperature,
-                stream=True,
-                extra_headers={
-                    "HTTP-Referer": "http://localhost:3000",
-                    "X-Title": "Osmo Assistant"
-                }
+                        model=settings.openrouter_model,
+                        messages=messages,
+                        max_tokens=settings.max_tokens,
+                        temperature=settings.temperature,
+                        stream=True,
+                        extra_headers={
+                            "HTTP-Referer": "http://localhost:3000",
+                            "X-Title": "Osmo Assistant"
+                        }
                     ),
                     timeout=30.0  # 30 second timeout
                 )
@@ -440,10 +417,12 @@ No other content, punctuation, or chain-of-thought.
             # Reset failure count on success
             self.api_failure_count = 0
             
-            # Stream the response chunks
+            # Stream the response chunks with small delays to keep UI responsive
             async for chunk in stream:
                 if chunk.choices[0].delta.content is not None:
                     yield chunk.choices[0].delta.content
+                    # Small delay to prevent overwhelming the event loop
+                    await asyncio.sleep(0.001)
                     
         except Exception as e:
             # Update circuit breaker on failure
@@ -537,8 +516,10 @@ No other content, punctuation, or chain-of-thought.
         finally:
             self.tts_process = None
 
-    def _prepare_video_message_for_api(self, video_path: str, duration: int, frames_recorded: int) -> dict:
+    def _prepare_video_message_for_api_sync(self, video_path: str, duration: int, frames_recorded: int) -> dict:
         """
+        Synchronous video processing for thread pool execution.
+        
         Prepare video message using stable CPU-only processing.
         
         This replaces the problematic qwen_vl_utils approach which caused memory corruption
@@ -565,138 +546,146 @@ No other content, punctuation, or chain-of-thought.
             
             # Verify video file exists and is readable
             if not os.path.exists(video_path):
-                logger.error(f"Video file does not exist: {video_path}")
-                return {
-                    "role": "user",
-                    "content": f"Tool result: Video file not found for processing."
-                }
+                raise FileNotFoundError(f"Video file not found: {video_path}")
             
-            # Open video file using OpenCV (CPU only)
+            # Get video file size for logging
+            file_size = os.path.getsize(video_path)
+            logger.info(f"Video file size: {file_size} bytes")
+            
+            # Open video with OpenCV (CPU-only, no GPU acceleration)
             cap = cv2.VideoCapture(video_path)
+            
             if not cap.isOpened():
-                logger.error("Failed to open video file for processing")
-                return {
-                    "role": "user",
-                    "content": f"Tool result: Video recorded successfully ({duration}s, {frames_recorded} frames), but could not process for analysis."
-                }
+                raise RuntimeError(f"OpenCV could not open video file: {video_path}")
             
-            try:
-                frames = []
-                frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-                fps = cap.get(cv2.CAP_PROP_FPS)
-                
-                # Sample up to 12 frames evenly distributed (optimized for analysis)
-                max_frames = min(12, frame_count)
-                if frame_count > max_frames:
-                    frame_indices = np.linspace(0, frame_count - 1, max_frames, dtype=int)
-                else:
-                    frame_indices = list(range(frame_count))
-                
-                logger.info(f"CPU processing: sampling {len(frame_indices)} frames from {frame_count} total")
-                
-                # Extract frames with memory safety
-                for frame_idx in frame_indices:
-                    try:
-                        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
-                        ret, frame = cap.read()
-                        if ret and frame is not None:
-                            # Create a copy to avoid memory aliasing issues
-                            frame_copy = frame.copy()
-                            frames.append(frame_copy)
-                            # Explicitly delete the original frame reference
-                            del frame
-                        else:
-                            logger.warning(f"Failed to read frame {frame_idx}")
-                    except Exception as frame_error:
-                        logger.warning(f"Error reading frame {frame_idx}: {frame_error}")
-                        continue
-                
-            finally:
-                # Always release the video capture object
-                cap.release()
+            # Get video properties
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            fps = cap.get(cv2.CAP_PROP_FPS) or 30.0  # Default to 30 if fps is 0
+            actual_duration = total_frames / fps
             
-            if not frames:
-                logger.error("No frames could be extracted")
-                return {
-                    "role": "user", 
-                    "content": f"Tool result: Video recorded successfully ({duration}s, {frames_recorded} frames), but frame extraction failed."
-                }
+            logger.info(f"Video info - Total frames: {total_frames}, FPS: {fps:.2f}, Duration: {actual_duration:.2f}s")
             
-            # Encode frames as JPEG base64 with explicit memory management
-            base64_frames = []
-            for i, frame in enumerate(frames):
-                try:
-                    # Convert BGR to RGB (OpenCV uses BGR, but we want RGB for consistency)
-                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    
-                    # Convert to PIL Image
-                    img = Image.fromarray(frame_rgb)
-                    
-                    # Resize if too large (memory optimization)
-                    max_dimension = 800
-                    if max(img.size) > max_dimension:
-                        img.thumbnail((max_dimension, max_dimension), Image.Resampling.LANCZOS)
-                    
-                    # Encode as JPEG with controlled quality
-                    output_buffer = BytesIO()
-                    img.save(output_buffer, format="JPEG", quality=75, optimize=True)
-                    byte_data = output_buffer.getvalue()
-                    
-                    # Clean up intermediate objects immediately
-                    output_buffer.close()
-                    del img, frame_rgb
-                    
-                    # Convert to base64
-                    base64_str = base64.b64encode(byte_data).decode("utf-8")
-                    base64_frames.append(base64_str)
-                    
-                    # Clean up byte data
-                    del byte_data, base64_str
-                    
-                except Exception as e:
-                    logger.warning(f"Failed to encode frame {i}: {e}")
+            # Smart frame sampling - sample up to 8 frames evenly distributed
+            # This balances context richness with API payload size
+            max_frames = min(8, total_frames)
+            frame_indices = []
+            
+            if total_frames <= max_frames:
+                # Use all frames if video is short
+                frame_indices = list(range(total_frames))
+            else:
+                # Sample frames evenly across the video duration
+                step = total_frames / max_frames
+                frame_indices = [int(i * step) for i in range(max_frames)]
+            
+            logger.info(f"Sampling {len(frame_indices)} frames from indices: {frame_indices}")
+            
+            # Extract frames
+            sampled_frames = []
+            frames_extracted = 0
+            
+            for target_frame in frame_indices:
+                # Seek to target frame
+                cap.set(cv2.CAP_PROP_POS_FRAMES, target_frame)
+                ret, frame = cap.read()
+                
+                if not ret:
+                    logger.warning(f"Could not read frame {target_frame}")
                     continue
-                finally:
-                    # Force cleanup of frame data
-                    del frames[i]
+                
+                # Convert BGR to RGB (OpenCV uses BGR by default)
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                
+                # Encode frame as JPEG with good compression
+                encode_params = [cv2.IMWRITE_JPEG_QUALITY, 85]  # 85% quality
+                ret, buffer = cv2.imencode('.jpg', cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR), encode_params)
+                
+                if ret:
+                    # Convert to base64
+                    frame_b64 = base64.b64encode(buffer).decode('utf-8')
+                    sampled_frames.append(frame_b64)
+                    frames_extracted += 1
+                    
+                    # Log frame size for monitoring
+                    frame_size = len(frame_b64)
+                    logger.debug(f"Frame {target_frame}: {frame_size} chars (base64)")
+                else:
+                    logger.warning(f"Could not encode frame {target_frame}")
             
-            # Clean up frames list and force garbage collection
-            del frames
-            gc.collect()  # Explicit garbage collection to prevent memory buildup
+            # Clean up OpenCV resources immediately
+            cap.release()
             
-            if not base64_frames:
-                logger.error("No frames could be encoded")
-                return {
-                    "role": "user",
-                    "content": f"Tool result: Video recorded successfully ({duration}s, {frames_recorded} frames), but encoding failed."
+            # Force garbage collection to ensure cleanup
+            gc.collect()
+            
+            if not sampled_frames:
+                raise RuntimeError("No frames could be extracted from video")
+            
+            logger.info(f"Successfully extracted {frames_extracted} frames")
+            
+            # Build the API message with multiple images representing the video timeline
+            content_parts = [
+                {
+                    "type": "text", 
+                    "text": f"This is a {duration}s video with {frames_recorded} recorded frames. Here are {len(sampled_frames)} key frames showing the video timeline:"
                 }
+            ]
             
-            logger.info(f"CPU processing successful: {len(base64_frames)} frames encoded safely")
+            # Add each frame as an image
+            for i, frame_b64 in enumerate(sampled_frames):
+                timestamp = (i / (len(sampled_frames) - 1) * duration) if len(sampled_frames) > 1 else 0
+                content_parts.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{frame_b64}",
+                        "detail": "high"
+                    }
+                })
+                # Add timestamp context for each frame
+                content_parts.append({
+                    "type": "text",
+                    "text": f"Frame at {timestamp:.1f}s"
+                })
             
             return {
                 "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": f"Tool result: Video recorded successfully ({duration}s, {len(base64_frames)} frames extracted). Here's the video:"
-                    },
-                    {
-                        "type": "video_url",
-                        "video_url": {
-                            "url": f"data:video/jpeg;base64,{','.join(base64_frames)}"
-                        }
-                    }
-                ]
+                "content": content_parts
             }
             
         except Exception as e:
             logger.error(f"Video processing failed: {e}")
-            # Force garbage collection on error too
-            import gc
-            gc.collect()
+            # Return error message instead of failing completely
             return {
                 "role": "user",
-                "content": f"Tool result: Video recorded successfully ({duration}s, {frames_recorded} frames), but processing failed: {str(e)}"
+                "content": f"Video processing failed: {str(e)}"
+            }
+
+    async def _prepare_video_message_for_api(self, video_path: str, duration: int, frames_recorded: int) -> dict:
+        """Prepare video message using CPU thread pool to prevent event loop blocking"""
+        try:
+            # Import container here to avoid circular imports
+            from .shared import container
+            
+            # Use CPU pool for video processing if available
+            if container.shared and container.shared.cpu_pool:
+                loop = asyncio.get_event_loop()
+                return await loop.run_in_executor(
+                    container.shared.cpu_pool,
+                    self._prepare_video_message_for_api_sync,
+                    video_path,
+                    duration,
+                    frames_recorded
+                )
+            else:
+                # Fallback to direct execution if no thread pool (should not happen)
+                logger.warning("No CPU thread pool available, falling back to direct video processing")
+                return self._prepare_video_message_for_api_sync(video_path, duration, frames_recorded)
+                
+        except Exception as e:
+            logger.error(f"Video message preparation failed: {e}")
+            return {
+                "role": "user",
+                "content": f"Video processing failed: {str(e)}"
             }
 
 

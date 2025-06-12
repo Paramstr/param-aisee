@@ -221,7 +221,7 @@ class VideoRecorder:
                 self._cleanup_file(video_path)
                 return result
             
-            # Convert to base64 for LLM processing
+            # Convert to base64 for LLM processing (use IO thread pool to prevent blocking)
             try:
                 # Verify video file was created and has content
                 if not os.path.exists(video_path) or os.path.getsize(video_path) == 0:
@@ -234,17 +234,8 @@ class VideoRecorder:
                 logger.info(f"🎬 Video file created: {file_size} bytes")
                 logger.info(f"💾 Video saved locally: {video_path}")
                 
-                with open(video_path, 'rb') as f:
-                    video_bytes = f.read()
-                    
-                    if len(video_bytes) == 0:
-                        return {
-                            "success": False,
-                            "error": "Video file is empty"
-                        }
-                    
-                    video_base64 = base64.b64encode(video_bytes).decode('utf-8')
-                    logger.info(f"🎬 Video encoded to base64: {len(video_base64)} characters")
+                # Use IO thread pool for file I/O to prevent blocking
+                video_base64 = await self._encode_video_to_base64(video_path)
                 
                 return {
                     "success": True,
@@ -310,7 +301,7 @@ class VideoRecorder:
                 sleep_time = max(0, frame_interval - elapsed)
                 
                 if sleep_time > 0:
-                    time.sleep(sleep_time)  # Use synchronous sleep instead of async
+                    await asyncio.sleep(sleep_time)  # Use async sleep to prevent blocking
             
             actual_duration = time.time() - start_time
             logger.info(f"🎬 Recording completed: {frames_recorded} frames in {actual_duration:.2f}s")
@@ -328,6 +319,41 @@ class VideoRecorder:
                 "error": f"Frame recording failed: {e}",
                 "frames_recorded": frames_recorded
             }
+    
+    def _encode_video_to_base64_sync(self, video_path: str) -> str:
+        """Synchronous video to base64 encoding for thread pool execution"""
+        with open(video_path, 'rb') as f:
+            video_bytes = f.read()
+            
+            if len(video_bytes) == 0:
+                raise ValueError("Video file is empty")
+            
+            video_base64 = base64.b64encode(video_bytes).decode('utf-8')
+            logger.info(f"🎬 Video encoded to base64: {len(video_base64)} characters")
+            return video_base64
+    
+    async def _encode_video_to_base64(self, video_path: str) -> str:
+        """Encode video to base64 using IO thread pool to prevent blocking"""
+        try:
+            # Import container here to avoid circular imports
+            from .shared import container
+            
+            # Use IO pool for file I/O if available
+            if container.shared and container.shared.io_pool:
+                loop = asyncio.get_event_loop()
+                return await loop.run_in_executor(
+                    container.shared.io_pool,
+                    self._encode_video_to_base64_sync,
+                    video_path
+                )
+            else:
+                # Fallback to direct execution if no thread pool (should not happen)
+                logger.warning("No IO thread pool available, falling back to direct video encoding")
+                return self._encode_video_to_base64_sync(video_path)
+                
+        except Exception as e:
+            logger.error(f"Video base64 encoding failed: {e}")
+            raise
     
     def _cleanup_file(self, file_path: str):
         """Clean up video file"""
