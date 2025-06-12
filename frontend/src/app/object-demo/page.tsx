@@ -33,7 +33,7 @@ export default function BusDemo() {
   const [detectionResults, setDetectionResults] = useState<DetectionResult[]>([]);
   const [totalLatency, setTotalLatency] = useState(0);
   const [frameCount, setFrameCount] = useState(0);
-  const [useCloud, setUseCloud] = useState(false);
+  const [useCloud, setUseCloud] = useState<boolean | null>(null);
   const [cloudAvailable, setCloudAvailable] = useState(false);
   const [localAvailable, setLocalAvailable] = useState(false);
   const [expandedFrame, setExpandedFrame] = useState<DetectionResult | null>(null);
@@ -234,6 +234,7 @@ export default function BusDemo() {
   };
 
   const toggleInferenceMode = async () => {
+    if (useCloud === null) return;
     const newMode = !useCloud;
     try {
       const response = await fetch('http://localhost:8000/object-demo/inference-mode', {
@@ -474,50 +475,81 @@ export default function BusDemo() {
                 {/* Inference Mode */}
                 <div>
                   <h3 className="text-sm font-medium text-gray-400 mb-2">Inference Mode</h3>
-                  <div className="flex bg-gray-700/30 rounded-lg p-1 mb-2">
-                    <button
-                      onClick={() => !isDetecting && cloudAvailable && toggleInferenceMode()}
-                      disabled={!cloudAvailable || isDetecting}
-                      className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all duration-200 ${
-                        useCloud
-                          ? 'bg-blue-600 text-white shadow-lg'
-                          : cloudAvailable && !isDetecting
-                          ? 'text-gray-300 hover:text-white hover:bg-gray-600/50'
-                          : 'text-gray-500 cursor-not-allowed'
-                      }`}
-                    >
-                      <div className="text-center">
-                        <div className="text-sm">☁️ Cloud</div>
-                        <div className={`text-xs ${cloudAvailable ? 'text-green-400' : 'text-red-400'}`}>
-                          {cloudAvailable ? '✅' : '❌'}
+                  {useCloud === null ? (
+                    <div className="flex bg-gray-700/30 rounded-lg p-1 mb-2">
+                      <div className="flex-1 px-3 py-2 rounded-md text-xs font-medium text-gray-500">
+                        <div className="text-center">
+                          <div className="text-sm">☁️ Cloud</div>
+                          <div className="text-xs text-gray-500">...</div>
                         </div>
                       </div>
-                    </button>
-                    <button
-                      onClick={() => !isDetecting && localAvailable && !useCloud ? null : toggleInferenceMode()}
-                      disabled={!localAvailable || isDetecting}
-                      className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all duration-200 ${
-                        !useCloud
-                          ? 'bg-green-600 text-white shadow-lg'
-                          : localAvailable && !isDetecting
-                          ? 'text-gray-300 hover:text-white hover:bg-gray-600/50'
-                          : 'text-gray-500 cursor-not-allowed'
-                      }`}
-                    >
-                      <div className="text-center">
-                        <div className="text-sm">🖥️ Local</div>
-                        <div className={`text-xs ${localAvailable ? 'text-green-400' : 'text-red-400'}`}>
-                          {localAvailable ? '✅' : '❌'}
+                      <div className="flex-1 px-3 py-2 rounded-md text-xs font-medium text-gray-500">
+                        <div className="text-center">
+                          <div className="text-sm">🖥️ Local</div>
+                          <div className="text-xs text-gray-500">...</div>
                         </div>
                       </div>
-                    </button>
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="flex bg-gray-700/30 rounded-lg p-1 mb-2">
+                      <button
+                        onClick={() => {
+                          if (!isDetecting && cloudAvailable && !useCloud) {
+                            toggleInferenceMode();
+                          }
+                        }}
+                        disabled={!cloudAvailable || isDetecting || useCloud}
+                        className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all duration-200 ${
+                          useCloud
+                            ? 'bg-blue-600 text-white shadow-lg'
+                            : cloudAvailable && !isDetecting
+                            ? 'text-gray-300 hover:text-white hover:bg-gray-600/50'
+                            : 'text-gray-500 cursor-not-allowed'
+                        }`}
+                      >
+                        <div className="text-center">
+                          <div className="text-sm">☁️ Cloud</div>
+                          <div className={`text-xs ${cloudAvailable ? 'text-green-400' : 'text-red-400'}`}>
+                            {cloudAvailable ? '✅' : '❌'}
+                          </div>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (!isDetecting && localAvailable && useCloud) {
+                            toggleInferenceMode();
+                          }
+                        }}
+                        disabled={!localAvailable || isDetecting || !useCloud}
+                        className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all duration-200 ${
+                          !useCloud
+                            ? 'bg-green-600 text-white shadow-lg'
+                            : localAvailable && !isDetecting
+                            ? 'text-gray-300 hover:text-white hover:bg-gray-600/50'
+                            : 'text-gray-500 cursor-not-allowed'
+                        }`}
+                      >
+                        <div className="text-center">
+                          <div className="text-sm">🖥️ Local</div>
+                          <div className={`text-xs ${localAvailable ? 'text-green-400' : 'text-red-400'}`}>
+                            {localAvailable ? '✅' : '❌'}
+                          </div>
+                        </div>
+                      </button>
+                    </div>
+                  )}
                   
                   {/* Current Mode Indicator */}
                   <div className="text-center p-2 bg-gray-700/20 rounded-lg border border-gray-600/30">
-                    <div className={`text-sm font-semibold ${useCloud ? 'text-blue-400' : 'text-green-400'}`}>
-                      {useCloud ? '☁️ Cloud Mode' : '🖥️ Local Mode'}
-                    </div>
+                    {useCloud === null ? (
+                      <div className="text-sm font-semibold text-gray-500">
+                        🔄 Loading Mode...
+                      </div>
+                    ) : (
+                      <div className={`text-sm font-semibold ${useCloud ? 'text-blue-400' : 'text-green-400'}`}>
+                        {useCloud ? '☁️ Cloud Mode' : '🖥️ Local Mode'}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
