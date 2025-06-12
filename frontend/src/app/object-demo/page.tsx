@@ -415,7 +415,7 @@ export default function BusDemo() {
                     
                     <button
                       onClick={() => {
-                        const airpodPrompt = "Look at this image and identify if there are any AirPods or earbuds on a table or surface. Return 'AirPods detected' if you see them, or 'Null";
+                        const airpodPrompt = "Look at this image and identify if there are any AirPods or earbuds on a table or surface. Return 'AirPods detected' if you see them, or 'Null'.";
                         setPromptText(airpodPrompt);
                         updateSystemPromptWithText(airpodPrompt);
                       }}
