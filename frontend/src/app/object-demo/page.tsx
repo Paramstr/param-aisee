@@ -793,7 +793,7 @@ export default function BusDemo() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-700/50">
-                        {[...detectionResults].reverse().map((result) => (
+                        {(detectionMode === 'camera' ? [...detectionResults].reverse() : detectionResults).map((result) => (
                           <tr key={result.id} className="hover:bg-gray-700/20">
                             <td className="px-4 py-3 text-sm text-gray-300 font-mono">
                               {result.timestamp}

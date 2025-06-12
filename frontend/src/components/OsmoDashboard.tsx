@@ -77,8 +77,8 @@ export function OsmoDashboard() {
                 </div>
               </div>
               
-              {/* Status and Debug Grid - Compact height */}
-              <div className="flex-shrink-0 grid grid-cols-1 md:grid-cols-2 gap-4" style={{ height: '240px' }}>
+              {/* Status and Debug Grid - Remaining height */}
+              <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-2 gap-4 auto-rows-fr overflow-hidden">
                 <div className="fade-in" style={{ animationDelay: '0.1s' }}>
                   <StatusBar
                     isConnected={isConnected}
@@ -86,14 +86,14 @@ export function OsmoDashboard() {
                     lastEvent={lastEvent}
                     error={error}
                     refreshSystemStatus={refreshSystemStatus}
-                    className="h-full"
+                    className="h-full min-h-0"
                   />
                 </div>
                 
                 <div className="fade-in" style={{ animationDelay: '0.2s' }}>
                   <DebugStream
                     lastEvent={lastEvent}
-                    className="h-full"
+                    className="h-full min-h-0"
                   />
                 </div>
               </div>

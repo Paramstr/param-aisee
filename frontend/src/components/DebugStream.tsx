@@ -23,6 +23,13 @@ export function DebugStream({ lastEvent, className = '' }: DebugStreamProps) {
   const isInContextMode = useRef(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   
+  // Auto-scroll to bottom when new transcripts are added
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+    }
+  }, [rawTranscripts]);
+  
   // Check if transcript contains wake words
   const containsWakeWord = (transcript: string): boolean => {
     const wakeWords = ["osmo", "hey osmo", "hey"];
@@ -49,7 +56,7 @@ export function DebugStream({ lastEvent, className = '' }: DebugStreamProps) {
             
           case 'raw_transcript':
             const rawTranscript = lastEvent.data?.transcript;
-            if (rawTranscript && rawTranscript.trim()) {
+            if (rawTranscript && typeof rawTranscript === 'string' && rawTranscript.trim()) {
               const hasWakeWord = containsWakeWord(rawTranscript);
               const newRawTranscript: RawTranscript = {
                 id: Date.now().toString(),
@@ -115,7 +122,7 @@ export function DebugStream({ lastEvent, className = '' }: DebugStreamProps) {
   }
   
   return (
-    <div className={`elevated-card rounded-xl flex flex-col h-full overflow-hidden ${className}`}>
+    <div className={`elevated-card rounded-xl flex flex-col h-full max-h-full overflow-hidden ${className}`}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800 flex-shrink-0">
         <div className="flex items-center space-x-2 min-w-0 flex-1">
@@ -147,7 +154,7 @@ export function DebugStream({ lastEvent, className = '' }: DebugStreamProps) {
       {/* Content */}
       <div 
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto p-4 space-y-2 text-sm min-h-0 max-h-full"
+        className="flex-1 min-h-0 overflow-y-auto p-4 space-y-2 text-sm scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent"
       >
         {rawTranscripts.length === 0 && (
           <div className="text-center py-6">
