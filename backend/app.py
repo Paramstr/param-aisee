@@ -331,7 +331,7 @@ app.mount("/object-demo/videos", StaticFiles(directory="backend/sample_videos"),
 async def start_object_detection(video_id: str):
     """Start object detection for a specific video"""
     try:
-        result = await object_detection_manager.start_detection(video_id)
+        result = await object_detection_manager.start_video_detection(video_id)
         if "error" in result:
             raise HTTPException(status_code=400, detail=result["error"])
         return result

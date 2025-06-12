@@ -10,22 +10,26 @@ from PIL import Image
 import moondream as md
 import shutil
 import tempfile
+import functools
+import concurrent.futures
 
 from ..events import event_bus, Event, EventType
 from ..config import settings
+from .shared import container
 
 logger = logging.getLogger(__name__)
 
-class VisionProcessor:
+class MoondreamProcessor:
     """Handles both Moondream Cloud and local Moondream Server inference"""
     
-    def __init__(self):
+    def __init__(self, cpu_pool: Optional[concurrent.futures.ThreadPoolExecutor] = None):
         self.cloud_model = None
         self.local_model = None
         self.cloud_available = False
         self.local_available = False
         self.use_cloud = False  # Default to local
         self.system_prompt = "What objects can you see in this image? Look for any identifiable objects, vehicles, people, or items clearly visible in the scene. Describe what you see in a concise manner. If you cannot see any clear objects respond with null."
+        self.cpu_pool = cpu_pool
         
     async def initialize(self):
         """Initialize both Moondream Cloud and local Moondream Server"""
@@ -83,7 +87,17 @@ class VisionProcessor:
         try:
             # Create a small test image
             test_image = Image.new('RGB', (100, 100), color='white')
-            result = self.cloud_model.caption(test_image)
+            
+            # Run in thread pool to avoid blocking
+            if self.cpu_pool:
+                loop = asyncio.get_event_loop()
+                result = await loop.run_in_executor(
+                    self.cpu_pool, 
+                    lambda: self.cloud_model.caption(test_image)
+                )
+            else:
+                result = self.cloud_model.caption(test_image)
+            
             return result is not None
         except Exception as e:
             logger.warning(f"Moondream Cloud test failed: {e}")
@@ -94,7 +108,17 @@ class VisionProcessor:
         try:
             # Create a small test image
             test_image = Image.new('RGB', (100, 100), color='white')
-            result = self.local_model.caption(test_image)
+            
+            # Run in thread pool to avoid blocking
+            if self.cpu_pool:
+                loop = asyncio.get_event_loop()
+                result = await loop.run_in_executor(
+                    self.cpu_pool, 
+                    lambda: self.local_model.caption(test_image)
+                )
+            else:
+                result = self.local_model.caption(test_image)
+            
             return result is not None
         except Exception as e:
             logger.warning(f"Moondream Server test failed: {e}")
@@ -118,13 +142,11 @@ class VisionProcessor:
             else:
                 raise RuntimeError("No inference method available")
     
-    async def _detect_local(self, frame, query: str) -> Dict:
-        """Local inference using Moondream Server"""
+    def _detect_local_sync(self, image_rgb, query: str) -> Dict:
+        """Synchronous local inference for thread pool execution"""
         start_time = time.time()
         
         try:
-            # Convert frame to PIL Image
-            image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             pil_image = Image.fromarray(image_rgb)
             
             # Use Moondream Server
@@ -147,13 +169,11 @@ class VisionProcessor:
                 "inference_type": "local"
             }
     
-    async def _detect_cloud(self, frame, query: str) -> Dict:
-        """Cloud inference using Moondream Cloud"""
+    def _detect_cloud_sync(self, image_rgb, query: str) -> Dict:
+        """Synchronous cloud inference for thread pool execution"""
         start_time = time.time()
         
         try:
-            # Convert frame to PIL Image
-            image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             pil_image = Image.fromarray(image_rgb)
             
             # Use Moondream Cloud
@@ -176,13 +196,70 @@ class VisionProcessor:
                 "inference_type": "cloud"
             }
     
+    async def _detect_local(self, frame, query: str) -> Dict:
+        """Local inference using Moondream Server - now async with thread pool"""
+        try:
+            # Convert frame to RGB
+            image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            
+            # Run inference in thread pool to avoid blocking the event loop
+            if self.cpu_pool:
+                loop = asyncio.get_event_loop()
+                result = await loop.run_in_executor(
+                    self.cpu_pool,
+                    self._detect_local_sync,
+                    image_rgb,
+                    query
+                )
+            else:
+                # Fallback to direct execution if no thread pool
+                result = self._detect_local_sync(image_rgb, query)
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Moondream Server inference failed: {e}")
+            return {
+                "response": f"Error: {str(e)}",
+                "latency": 0,
+                "inference_type": "local"
+            }
+    
+    async def _detect_cloud(self, frame, query: str) -> Dict:
+        """Cloud inference using Moondream Cloud - now async with thread pool"""
+        try:
+            # Convert frame to RGB
+            image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            
+            # Run inference in thread pool to avoid blocking the event loop
+            if self.cpu_pool:
+                loop = asyncio.get_event_loop()
+                result = await loop.run_in_executor(
+                    self.cpu_pool,
+                    self._detect_cloud_sync,
+                    image_rgb,
+                    query
+                )
+            else:
+                # Fallback to direct execution if no thread pool
+                result = self._detect_cloud_sync(image_rgb, query)
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Moondream Cloud inference failed: {e}")
+            return {
+                "response": f"Error: {str(e)}",
+                "latency": 0,
+                "inference_type": "cloud"
+            }
 
 
 class ObjectDetectionManager:
     """Enhanced object detection manager with upload capability"""
     
     def __init__(self):
-        self.vision_processor = VisionProcessor()
+        self.moondream_processor = None  # Will be initialized with CPU pool
         self.is_running = False
         self.detection_task: Optional[asyncio.Task] = None
         self.videos_dir = Path("backend/sample_videos")
@@ -190,29 +267,32 @@ class ObjectDetectionManager:
         self.current_video_id = None  # Track uploaded video
         
     async def initialize(self):
-        """Initialize vision processor"""
-        await self.vision_processor.initialize()
-        logger.info("Object detection manager initialized")
+        """Initialize Moondream processor with CPU thread pool"""
+        # Get CPU pool from container
+        cpu_pool = container.shared.cpu_pool if container.shared else None
+        self.moondream_processor = MoondreamProcessor(cpu_pool=cpu_pool)
+        await self.moondream_processor.initialize()
+        logger.info("Object detection manager initialized with CPU thread pool")
     
     def set_inference_mode(self, use_cloud: bool) -> Dict:
         """Switch between cloud and local inference"""
-        if use_cloud and not self.vision_processor.cloud_available:
+        if use_cloud and not self.moondream_processor.cloud_available:
             return {"error": "Moondream Cloud not available"}
-        if not use_cloud and not self.vision_processor.local_available:
+        if not use_cloud and not self.moondream_processor.local_available:
             return {"error": "Moondream Server not available"}
         
-        self.vision_processor.use_cloud = use_cloud
+        self.moondream_processor.use_cloud = use_cloud
         mode = "cloud" if use_cloud else "local"
         logger.info(f"Switched to {mode} inference")
         return {"message": f"Switched to {mode} inference", "mode": mode}
     
     def set_system_prompt(self, prompt: str) -> Dict:
         """Update the system prompt for inference"""
-        return self.vision_processor.set_system_prompt(prompt)
+        return self.moondream_processor.set_system_prompt(prompt)
     
     def get_system_prompt(self) -> str:
         """Get the current system prompt"""
-        return self.vision_processor.get_system_prompt()
+        return self.moondream_processor.get_system_prompt()
     
     async def upload_video(self, video_content: bytes, filename: str) -> Dict:
         """Upload a custom video file"""
@@ -299,7 +379,7 @@ class ObjectDetectionManager:
         videos.sort(key=lambda x: x["name"])
         return videos
 
-    async def start_detection(self, video_id: str) -> Dict:
+    async def start_video_detection(self, video_id: str) -> Dict:
         """Start processing video frames with Moondream"""
         if self.is_running:
             return {"error": "Detection already running"}
@@ -328,6 +408,22 @@ class ObjectDetectionManager:
         ))
         
         return {"message": f"Started detection on {video_name}", "video_id": video_id}
+    
+    async def start_realtime_detection(self) -> Dict:
+        """Start real-time object detection using live camera feed"""
+        if self.is_running:
+            return {"error": "Detection already running"}
+        
+        self.is_running = True
+        self.detection_task = asyncio.create_task(self._process_realtime())
+        
+        await event_bus.publish(Event(
+            type=EventType.OBJECT_DEMO,
+            action="detection_started",
+            data={"video_id": "realtime", "video_name": "Live Camera Feed"}
+        ))
+        
+        return {"message": "Started real-time detection", "video_id": "realtime"}
     
     async def stop_detection(self) -> Dict:
         """Stop detection"""
@@ -368,8 +464,8 @@ class ObjectDetectionManager:
                     video_timestamp_sec = frame_index / fps if fps > 0 else frame_index / 30
                     video_timestamp_formatted = f"{int(video_timestamp_sec // 60):02d}:{int(video_timestamp_sec % 60):02d}.{int((video_timestamp_sec % 1) * 1000):03d}"
                     
-                    # Send frame to vision processor
-                    result = await self.vision_processor.detect_objects(frame)
+                    # Send frame to Moondream processor (now runs in CPU thread pool)
+                    result = await self.moondream_processor.detect_objects(frame)
                     
                     if result["response"].strip().lower() != "null":
                         # Convert frame to base64
@@ -390,8 +486,12 @@ class ObjectDetectionManager:
                             }
                         ))
                     
-                    # Small delay between processing
-                    await asyncio.sleep(0.1)
+                    # Yield control after processing to keep event loop responsive
+                    await asyncio.sleep(0.01)
+                else:
+                    # Yield control more frequently for better responsiveness
+                    if frame_index % 10 == 0:
+                        await asyncio.sleep(0.001)
                 
                 frame_index += 1
             
@@ -418,16 +518,81 @@ class ObjectDetectionManager:
                 cap.release()
             self.is_running = False
     
+    async def _process_realtime(self):
+        """Process live camera frames with Moondream"""
+        try:
+            frame_counter = 0
+            
+            while self.is_running:
+                # Get latest frame from the main vision processor
+                frame = container.vision_processor.get_latest_frame()
+                
+                if frame is not None:
+                    # Process every 15 frames (roughly 2 frames per second at 30fps)
+                    if frame_counter % 15 == 0:
+                        # Send frame to Moondream processor (now runs in CPU thread pool)
+                        result = await self.moondream_processor.detect_objects(frame)
+                        
+                        if result["response"].strip().lower() != "null":
+                            # Convert frame to base64
+                            _, buffer = cv2.imencode('.jpg', frame)
+                            frame_b64 = base64.b64encode(buffer).decode('utf-8')
+                            
+                            # Stream result to frontend
+                            await event_bus.publish(Event(
+                                type=EventType.OBJECT_DEMO,
+                                action="detection_result",
+                                data={
+                                    "timestamp": "LIVE",
+                                    "videoTimestamp": time.time(),
+                                    "latency": result["latency"],
+                                    "detectedObjects": result["response"],
+                                    "frameUrl": f"data:image/jpeg;base64,{frame_b64}",
+                                    "frameIndex": frame_counter // 15
+                                }
+                            ))
+                        
+                        # Yield control after processing to keep event loop responsive
+                        await asyncio.sleep(0.01)
+                    else:
+                        # Yield control for unprocessed frames to keep event loop responsive
+                        await asyncio.sleep(0.001)
+                    
+                    frame_counter += 1
+                else:
+                    # No frame available, wait a bit longer
+                    await asyncio.sleep(0.1)
+            
+            self.is_running = False
+            
+            await event_bus.publish(Event(
+                type=EventType.OBJECT_DEMO,
+                action="detection_completed",
+                data={}
+            ))
+            
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.error(f"Real-time processing failed: {e}")
+            await event_bus.publish(Event(
+                type=EventType.OBJECT_DEMO,
+                action="detection_error",
+                data={"error": str(e)}
+            ))
+        finally:
+            self.is_running = False
+    
     def get_status(self) -> Dict:
         """Get demo status"""
         video_count = len(list(self.videos_dir.glob("*.mp4"))) + len(list(self.videos_dir.glob("*.mov")))
         return {
             "is_running": self.is_running,
-            "cloud_available": self.vision_processor.cloud_available,
-            "local_available": self.vision_processor.local_available,
-            "current_mode": "cloud" if self.vision_processor.use_cloud else "local",
+            "cloud_available": self.moondream_processor.cloud_available,
+            "local_available": self.moondream_processor.local_available,
+            "current_mode": "cloud" if self.moondream_processor.use_cloud else "local",
             "videos_available": video_count,
-            "system_prompt": self.vision_processor.get_system_prompt()
+            "system_prompt": self.moondream_processor.get_system_prompt()
         }
 
 # Global object detection manager instance
