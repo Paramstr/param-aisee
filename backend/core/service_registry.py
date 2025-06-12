@@ -22,7 +22,8 @@ class ServiceRegistry:
                 "tool_registry"
             },
             "object_demo": {
-                "object_detection_manager"
+                "object_detection_manager",
+                "vision_processor"  # Need camera for real-time detection
             }
         }
         
@@ -38,7 +39,7 @@ class ServiceRegistry:
                 "camera_control", "error"
             },
             "object_demo": {
-                "system_status", "object_demo", "error"
+                "system_status", "object_demo", "camera_control", "error"
             }
         }
     

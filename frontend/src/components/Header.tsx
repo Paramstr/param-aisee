@@ -8,7 +8,7 @@ export function Header() {
 
   const tabs = [
     { href: '/', label: 'Osmo', icon: '🤖', subtitle: 'AI Assistant' },
-    { href: '/object-demo', label: 'Bus Demo', icon: '🚌', subtitle: 'Transportation' },
+    { href: '/object-demo', label: 'Object Demo', icon: '📸', subtitle: 'Object Detection' },
   ];
 
   return (

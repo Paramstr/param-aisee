@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useWebSocket } from '@/lib/WebSocketProvider';
+import { CameraFeed } from '@/components/CameraFeed';
 
 interface DetectionResult {
   id: string;
@@ -40,6 +41,7 @@ export default function BusDemo() {
   const [isEditingPrompt, setIsEditingPrompt] = useState(false);
   const [promptText, setPromptText] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [detectionMode, setDetectionMode] = useState<'video' | 'camera'>('video');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { lastEvent } = useWebSocket();
@@ -148,31 +150,62 @@ export default function BusDemo() {
     }
   }, [lastEvent]);
 
+  // Clear detection results when switching detection modes
+  useEffect(() => {
+    setDetectionResults([]);
+    setTotalLatency(0);
+    setFrameCount(0);
+  }, [detectionMode]);
+
   const startDetection = async () => {
-    if (!selectedVideo) {
-      console.warn('❌ No video selected for detection');
-      return;
-    }
-    
-    console.log(`🎬 Starting detection for video: ${selectedVideo.id} (${selectedVideo.name})`);
-    
-    try {
-      const response = await fetch(`http://localhost:8000/object-demo/start/${selectedVideo.id}`, {
-        method: 'POST'
-      });
-      
-      if (response.ok) {
-        const result = await response.json();
-        console.log('✅ Detection started:', result.message);
-        // State will be updated via WebSocket events
-      } else {
-        const error = await response.json();
-        console.error('❌ Failed to start detection:', error.detail);
-        alert(`Failed to start detection: ${error.detail}`);
+    if (detectionMode === 'video') {
+      if (!selectedVideo) {
+        console.warn('❌ No video selected for detection');
+        return;
       }
-    } catch (error) {
-      console.error('❌ Error starting detection:', error);
-      alert('Error starting detection. Make sure the backend is running.');
+      
+      console.log(`🎬 Starting video detection for: ${selectedVideo.id} (${selectedVideo.name})`);
+      
+      try {
+        const response = await fetch(`http://localhost:8000/object-demo/start/${selectedVideo.id}`, {
+          method: 'POST'
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          console.log('✅ Video detection started:', result.message);
+          // State will be updated via WebSocket events
+        } else {
+          const error = await response.json();
+          console.error('❌ Failed to start video detection:', error.detail);
+          alert(`Failed to start video detection: ${error.detail}`);
+        }
+      } catch (error) {
+        console.error('❌ Error starting video detection:', error);
+        alert('Error starting video detection. Make sure the backend is running.');
+      }
+    } else {
+      // Camera mode
+      console.log('📹 Starting real-time camera detection');
+      
+      try {
+        const response = await fetch('http://localhost:8000/object-demo/start-realtime', {
+          method: 'POST'
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          console.log('✅ Camera detection started:', result.message);
+          // State will be updated via WebSocket events
+        } else {
+          const error = await response.json();
+          console.error('❌ Failed to start camera detection:', error.detail);
+          alert(`Failed to start camera detection: ${error.detail}`);
+        }
+      } catch (error) {
+        console.error('❌ Error starting camera detection:', error);
+        alert('Error starting camera detection. Make sure the backend is running.');
+      }
     }
   };
 
@@ -354,10 +387,54 @@ export default function BusDemo() {
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             {/* Left Panel - Video Selection & Controls */}
             <div className="xl:col-span-1 space-y-6">
-              {/* Video Selection */}
+              {/* Detection Mode Toggle */}
               <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-semibold text-white">Select Scenario</h2>
+                <h2 className="text-xl font-semibold text-white mb-4">Detection Mode</h2>
+                <div className="flex items-center space-x-4">
+                  <div className="flex-1">
+                    <div className="flex bg-gray-700/30 rounded-lg p-1">
+                      <button
+                        onClick={() => setDetectionMode('video')}
+                        className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                          detectionMode === 'video'
+                            ? 'bg-blue-600 text-white shadow-lg'
+                            : 'text-gray-300 hover:text-white hover:bg-gray-600/50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-center space-x-2">
+                          <span>🎥</span>
+                          <span>Video Simulation</span>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => setDetectionMode('camera')}
+                        className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                          detectionMode === 'camera'
+                            ? 'bg-blue-600 text-white shadow-lg'
+                            : 'text-gray-300 hover:text-white hover:bg-gray-600/50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-center space-x-2">
+                          <span>📹</span>
+                          <span>Real-time Camera</span>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-3 text-xs text-gray-400">
+                  {detectionMode === 'video' 
+                    ? 'Process uploaded videos frame by frame'
+                    : 'Live detection using camera feed'
+                  }
+                </div>
+              </div>
+
+              {/* Video Selection */}
+              {detectionMode === 'video' && (
+                <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-semibold text-white">Select Scenario</h2>
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploading}
@@ -407,6 +484,7 @@ export default function BusDemo() {
                   )}
                 </div>
               </div>
+              )}
 
               {/* System Prompt */}
               <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
@@ -549,9 +627,9 @@ export default function BusDemo() {
                 <div className="space-y-4">
                   <button
                     onClick={startDetection}
-                    disabled={!selectedVideo || isDetecting}
+                    disabled={(detectionMode === 'video' && !selectedVideo) || isDetecting}
                     className={`w-full py-3 px-4 rounded-lg font-medium transition-all duration-200 ${
-                      !selectedVideo || isDetecting
+                      (detectionMode === 'video' && !selectedVideo) || isDetecting
                         ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
                         : 'bg-green-600 hover:bg-green-700 text-white shadow-lg hover:shadow-green-600/25'
                     }`}
@@ -597,37 +675,53 @@ export default function BusDemo() {
 
             {/* Right Panel - Video Simulation & Results */}
             <div className="xl:col-span-2 space-y-6">
-              {/* Video Simulation Area */}
+              {/* Video/Camera Feed Area */}
               <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
-                <h2 className="text-xl font-semibold text-white mb-4">Realtime Video Feed</h2>
+                <h2 className="text-xl font-semibold text-white mb-4">
+                  {detectionMode === 'video' ? 'Video Feed' : 'Camera Feed'}
+                </h2>
                 <div className="aspect-video bg-gray-900/50 rounded-lg border border-gray-700/50 flex items-center justify-center overflow-hidden">
-                  {selectedVideo && selectedVideo.url ? (
-                    <video
-                      key={selectedVideo.id}
-                      controls
-                      className="w-full h-full object-contain"
-                      style={{ maxHeight: '100%', maxWidth: '100%' }}
-                    >
-                      <source src={selectedVideo.url} type="video/mp4" />
-                      Your browser does not support video playback.
-                    </video>
-                  ) : selectedVideo ? (
-                    <div className="text-center">
-                      <div className="text-6xl mb-4">{selectedVideo.thumbnail}</div>
-                      <div className="text-xl font-medium text-white mb-2">{selectedVideo.name}</div>
-                      <div className="text-gray-400">{selectedVideo.description}</div>
-                      <div className="text-sm text-yellow-400 mt-2">Video file not available for streaming</div>
+                  {detectionMode === 'video' ? (
+                    // Video mode content
+                    selectedVideo && selectedVideo.url ? (
+                      <video
+                        key={selectedVideo.id}
+                        controls
+                        className="w-full h-full object-contain"
+                        style={{ maxHeight: '100%', maxWidth: '100%' }}
+                      >
+                        <source src={selectedVideo.url} type="video/mp4" />
+                        Your browser does not support video playback.
+                      </video>
+                    ) : selectedVideo ? (
+                      <div className="text-center">
+                        <div className="text-6xl mb-4">{selectedVideo.thumbnail}</div>
+                        <div className="text-xl font-medium text-white mb-2">{selectedVideo.name}</div>
+                        <div className="text-gray-400">{selectedVideo.description}</div>
+                        <div className="text-sm text-yellow-400 mt-2">Video file not available for streaming</div>
+                        {isDetecting && (
+                          <div className="mt-4 flex items-center justify-center space-x-2">
+                            <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                            <span className="text-red-400 font-medium">DETECTING</span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center text-gray-500">
+                        <div className="text-4xl mb-2">📹</div>
+                        <div>Select a scenario to begin</div>
+                      </div>
+                    )
+                  ) : (
+                    // Camera mode content
+                    <div className="w-full h-full relative">
+                      <CameraFeed className="w-full h-full" />
                       {isDetecting && (
-                        <div className="mt-4 flex items-center justify-center space-x-2">
-                          <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-                          <span className="text-red-400 font-medium">DETECTING</span>
+                        <div className="absolute top-4 left-4 flex items-center space-x-2 bg-red-600/80 text-white px-3 py-1 rounded-lg">
+                          <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                          <span className="text-sm font-medium">DETECTING</span>
                         </div>
                       )}
-                    </div>
-                  ) : (
-                    <div className="text-center text-gray-500">
-                      <div className="text-4xl mb-2">📹</div>
-                      <div>Select a scenario to begin</div>
                     </div>
                   )}
                 </div>

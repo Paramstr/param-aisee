@@ -340,6 +340,19 @@ async def start_object_detection(video_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/object-demo/start-realtime")
+async def start_realtime_object_detection():
+    """Start real-time object detection using camera feed"""
+    try:
+        result = await object_detection_manager.start_realtime_detection()
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        return result
+    except Exception as e:
+        logger.error(f"Error starting real-time object detection: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/object-demo/stop")
 async def stop_object_detection():
     """Stop object detection"""
