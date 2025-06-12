@@ -27,7 +27,10 @@ class MoondreamProcessor:
         self.local_model = None
         self.cloud_available = False
         self.local_available = False
-        self.use_cloud = False  # Default to local
+        # Default to cloud inference. If cloud is unavailable the processor will automatically
+        # fall back to the local Moondream server, so starting in cloud mode keeps the logic
+        # simple for callers while still remaining resilient.
+        self.use_cloud = True
         self.system_prompt = "What objects can you see in this image? Look for any identifiable objects, vehicles, people, or items clearly visible in the scene. Describe what you see in a concise manner. If you cannot see any clear objects respond with null."
         self.cpu_pool = cpu_pool
         

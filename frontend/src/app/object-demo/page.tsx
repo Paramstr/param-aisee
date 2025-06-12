@@ -33,7 +33,7 @@ export default function BusDemo() {
   const [detectionResults, setDetectionResults] = useState<DetectionResult[]>([]);
   const [totalLatency, setTotalLatency] = useState(0);
   const [frameCount, setFrameCount] = useState(0);
-  const [useCloud, setUseCloud] = useState<boolean | null>(null);
+  const [useCloud, setUseCloud] = useState<boolean | null>(true);
   const [cloudAvailable, setCloudAvailable] = useState(false);
   const [localAvailable, setLocalAvailable] = useState(false);
   const [expandedFrame, setExpandedFrame] = useState<DetectionResult | null>(null);
