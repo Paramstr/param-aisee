@@ -376,143 +376,231 @@ export default function BusDemo() {
       <div className="p-6">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
-          <div className="text-center mb-8">
+          <div className="text-center mb-6">
             <div className="text-6xl mb-4">🚌</div>
             <h1 className="text-4xl font-bold text-white mb-2">Object Detection Demo</h1>
-            <p className="text-gray-400 text-lg">
+            <p className="text-gray-400 text-lg mb-6">
               Simulate realtime object detection using Moondream VLM with latency measurements
             </p>
+            
+            {/* Detection Controls at Top */}
+            <div className="max-w-md mx-auto">
+              <div className="relative group">
+                <button
+                  onClick={startDetection}
+                  disabled={(detectionMode === 'video' && !selectedVideo) || isDetecting}
+                  className={`w-full py-4 px-6 rounded-xl font-medium text-lg transition-all duration-200 ${
+                    (detectionMode === 'video' && !selectedVideo) || isDetecting
+                      ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
+                      : 'bg-green-600 hover:bg-green-700 text-white shadow-lg hover:shadow-green-600/25'
+                  }`}
+                >
+                  {isDetecting ? (
+                    <div className="flex items-center justify-center space-x-2">
+                      <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                      <span>Detecting...</span>
+                    </div>
+                  ) : (
+                    '🔍 Watch for Objects'
+                  )}
+                </button>
+                
+                {/* Tooltip for disabled state */}
+                {((detectionMode === 'video' && !selectedVideo) || isDetecting) && (
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10 border border-gray-700">
+                    {isDetecting 
+                      ? 'Detection is already running'
+                      : detectionMode === 'video' && !selectedVideo
+                      ? 'Please select a video scenario first'
+                      : 'Unable to start detection'
+                    }
+                    {/* Tooltip arrow */}
+                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                  </div>
+                )}
+              </div>
+              
+              {isDetecting && (
+                <button
+                  onClick={stopDetection}
+                  className="w-full mt-3 py-2 px-4 rounded-lg font-medium bg-red-600 hover:bg-red-700 text-white transition-all duration-200"
+                >
+                  Stop Detection
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            {/* Left Panel - Video Selection & Controls */}
-            <div className="xl:col-span-1 space-y-6">
-              {/* Detection Mode Toggle */}
-              <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
-                <h2 className="text-xl font-semibold text-white mb-4">Detection Mode</h2>
-                <div className="flex items-center space-x-4">
-                  <div className="flex-1">
-                    <div className="flex bg-gray-700/30 rounded-lg p-1">
-                      <button
-                        onClick={() => setDetectionMode('video')}
-                        className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-                          detectionMode === 'video'
-                            ? 'bg-blue-600 text-white shadow-lg'
-                            : 'text-gray-300 hover:text-white hover:bg-gray-600/50'
-                        }`}
-                      >
-                        <div className="flex items-center justify-center space-x-2">
-                          <span>🎥</span>
-                          <span>Video Simulation</span>
-                        </div>
-                      </button>
-                      <button
-                        onClick={() => setDetectionMode('camera')}
-                        className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-                          detectionMode === 'camera'
-                            ? 'bg-blue-600 text-white shadow-lg'
-                            : 'text-gray-300 hover:text-white hover:bg-gray-600/50'
-                        }`}
-                      >
-                        <div className="flex items-center justify-center space-x-2">
-                          <span>📹</span>
-                          <span>Real-time Camera</span>
-                        </div>
-                      </button>
-                    </div>
+            {/* Left Panel - Compact Configuration */}
+            <div className="xl:col-span-1 space-y-4">
+              {/* Detection Mode & Inference Mode Combined */}
+              <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
+                <h2 className="text-lg font-semibold text-white mb-3">Configuration</h2>
+                
+                {/* Detection Mode */}
+                <div className="mb-4">
+                  <h3 className="text-sm font-medium text-gray-400 mb-2">Detection Mode</h3>
+                  <div className="flex bg-gray-700/30 rounded-lg p-1">
+                    <button
+                      onClick={() => setDetectionMode('video')}
+                      className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                        detectionMode === 'video'
+                          ? 'bg-blue-600 text-white shadow-lg'
+                          : 'text-gray-300 hover:text-white hover:bg-gray-600/50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-center space-x-1">
+                        <span>🎥</span>
+                        <span>Video</span>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => setDetectionMode('camera')}
+                      className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                        detectionMode === 'camera'
+                          ? 'bg-blue-600 text-white shadow-lg'
+                          : 'text-gray-300 hover:text-white hover:bg-gray-600/50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-center space-x-1">
+                        <span>📹</span>
+                        <span>Camera</span>
+                      </div>
+                    </button>
                   </div>
                 </div>
-                <div className="mt-3 text-xs text-gray-400">
-                  {detectionMode === 'video' 
-                    ? 'Process uploaded videos frame by frame'
-                    : 'Live detection using camera feed'
-                  }
+
+                {/* Inference Mode */}
+                <div>
+                  <h3 className="text-sm font-medium text-gray-400 mb-2">Inference Mode</h3>
+                  <div className="flex bg-gray-700/30 rounded-lg p-1 mb-2">
+                    <button
+                      onClick={() => !isDetecting && cloudAvailable && toggleInferenceMode()}
+                      disabled={!cloudAvailable || isDetecting}
+                      className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all duration-200 ${
+                        useCloud
+                          ? 'bg-blue-600 text-white shadow-lg'
+                          : cloudAvailable && !isDetecting
+                          ? 'text-gray-300 hover:text-white hover:bg-gray-600/50'
+                          : 'text-gray-500 cursor-not-allowed'
+                      }`}
+                    >
+                      <div className="text-center">
+                        <div className="text-sm">☁️ Cloud</div>
+                        <div className={`text-xs ${cloudAvailable ? 'text-green-400' : 'text-red-400'}`}>
+                          {cloudAvailable ? '✅' : '❌'}
+                        </div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => !isDetecting && localAvailable && !useCloud ? null : toggleInferenceMode()}
+                      disabled={!localAvailable || isDetecting}
+                      className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all duration-200 ${
+                        !useCloud
+                          ? 'bg-green-600 text-white shadow-lg'
+                          : localAvailable && !isDetecting
+                          ? 'text-gray-300 hover:text-white hover:bg-gray-600/50'
+                          : 'text-gray-500 cursor-not-allowed'
+                      }`}
+                    >
+                      <div className="text-center">
+                        <div className="text-sm">🖥️ Local</div>
+                        <div className={`text-xs ${localAvailable ? 'text-green-400' : 'text-red-400'}`}>
+                          {localAvailable ? '✅' : '❌'}
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                  
+                  {/* Current Mode Indicator */}
+                  <div className="text-center p-2 bg-gray-700/20 rounded-lg border border-gray-600/30">
+                    <div className={`text-sm font-semibold ${useCloud ? 'text-blue-400' : 'text-green-400'}`}>
+                      {useCloud ? '☁️ Cloud Mode' : '🖥️ Local Mode'}
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {/* Video Selection */}
               {detectionMode === 'video' && (
-                <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-semibold text-white">Select Scenario</h2>
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploading}
-                    className="px-3 py-1 text-sm bg-gray-600 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center space-x-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                    <span>{isUploading ? 'Uploading...' : 'Upload Video'}</span>
-                  </button>
-                </div>
-                <div className="space-y-3">
-                  {busVideos.length > 0 ? (
-                    busVideos.map((video) => (
-                      <button
-                        key={video.id}
-                        onClick={() => selectVideo(video)}
-                        className={`w-full p-4 rounded-lg border transition-all duration-200 text-left ${
-                          selectedVideo?.id === video.id
-                            ? 'bg-blue-600/30 border-blue-500/50 text-blue-200'
-                            : 'bg-gray-700/30 border-gray-600/50 text-gray-300 hover:bg-gray-600/30'
-                        }`}
-                      >
-                        <div className="flex items-center space-x-3">
-                          <span className="text-2xl">{video.thumbnail}</span>
-                          <div className="flex-1">
-                            <div className="font-medium">{video.name}</div>
-                            <div className="text-sm opacity-75">{video.description}</div>
-                            <div className="text-xs opacity-60">{video.duration}s duration</div>
-                            {video.type === 'uploaded' && (
-                              <span className="inline-block mt-1 px-2 py-0.5 text-xs bg-green-600/20 text-green-400 rounded">
-                                Custom
-                              </span>
-                            )}
+                <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-lg font-semibold text-white">Select Scenario</h2>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                      className="px-2 py-1 text-xs bg-gray-600 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded transition-colors flex items-center space-x-1"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                      <span>{isUploading ? 'Uploading...' : 'Upload'}</span>
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {busVideos.length > 0 ? (
+                      busVideos.map((video) => (
+                        <button
+                          key={video.id}
+                          onClick={() => selectVideo(video)}
+                          className={`w-full p-3 rounded-lg border transition-all duration-200 text-left ${
+                            selectedVideo?.id === video.id
+                              ? 'bg-blue-600/30 border-blue-500/50 text-blue-200'
+                              : 'bg-gray-700/30 border-gray-600/50 text-gray-300 hover:bg-gray-600/30'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-2">
+                            <span className="text-lg">{video.thumbnail}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm truncate">{video.name}</div>
+                              <div className="text-xs opacity-75 truncate">{video.description}</div>
+                              <div className="flex items-center space-x-2 mt-1">
+                                <span className="text-xs opacity-60">{video.duration}s</span>
+                                {video.type === 'uploaded' && (
+                                  <span className="px-1.5 py-0.5 text-xs bg-green-600/20 text-green-400 rounded">
+                                    Custom
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </button>
-                    ))
-                  ) : (
-                    <div className="text-center py-6 text-gray-500">
-                      <div className="text-4xl mb-2">📹</div>
-                      <div className="text-sm">No videos found</div>
-                      <div className="text-xs mt-1">
-                        Place video files (.mp4 or .mov) in backend/sample_videos/ or upload your own
+                        </button>
+                      ))
+                    ) : (
+                      <div className="text-center py-4 text-gray-500">
+                        <div className="text-2xl mb-1">📹</div>
+                        <div className="text-xs">No videos found</div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
-              </div>
               )}
 
-              {/* System Prompt */}
-              <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
-                <div className="mb-4">
-                  <h2 className="text-xl font-semibold text-white">Detection Prompt</h2>
-                </div>
+              {/* Detection Prompt - Compact */}
+              <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
+                <h2 className="text-lg font-semibold text-white mb-3">Detection Prompt</h2>
 
                 {/* Preset Prompts */}
-                <div className="mb-4">
-                  <h3 className="text-sm font-medium text-gray-400 mb-2">Quick Presets:</h3>
-                  <div className="grid grid-cols-1 gap-2">
+                <div className="mb-3">
+                  <h3 className="text-xs font-medium text-gray-400 mb-2">Quick Presets:</h3>
+                  <div className="space-y-1">
                     <button
                       onClick={() => {
                         const busPrompt = "Identify any bus numbers visible and return only the bus number you can see. If no bus numbers are visible, respond with 'Null'.";
                         setPromptText(busPrompt);
                         updateSystemPromptWithText(busPrompt);
                       }}
-                      className={`px-3 py-2 text-sm text-left rounded-lg border transition-colors ${
+                      className={`w-full px-2 py-1.5 text-xs text-left rounded border transition-colors ${
                         systemPrompt.includes('bus number') 
                           ? 'bg-blue-600/20 border-blue-500/50 text-blue-300' 
                           : 'bg-gray-700/30 border-gray-600/50 text-gray-300 hover:bg-gray-600/30'
                       }`}
                     >
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-1">
                         <span>🚌</span>
-                        <span className="font-medium">Finding Bus Number</span>
+                        <span className="font-medium">Bus Numbers</span>
                       </div>
-                      <div className="text-xs opacity-75 mt-1">Detect bus numbers in traffic scenes</div>
                     </button>
                     
                     <button
@@ -521,35 +609,32 @@ export default function BusDemo() {
                         setPromptText(airpodPrompt);
                         updateSystemPromptWithText(airpodPrompt);
                       }}
-                      className={`px-3 py-2 text-sm text-left rounded-lg border transition-colors ${
+                      className={`w-full px-2 py-1.5 text-xs text-left rounded border transition-colors ${
                         systemPrompt.includes('AirPods') 
                           ? 'bg-blue-600/20 border-blue-500/50 text-blue-300' 
                           : 'bg-gray-700/30 border-gray-600/50 text-gray-300 hover:bg-gray-600/30'
                       }`}
                     >
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-1">
                         <span>🎧</span>
-                        <span className="font-medium">Finding AirPods on Table</span>
+                        <span className="font-medium">AirPods Detection</span>
                       </div>
-                      <div className="text-xs opacity-75 mt-1">Detect AirPods on tables or surfaces</div>
                     </button>
                   </div>
                 </div>
 
                 {/* Active Prompt Display */}
-                <div className="mb-4">
-                  <h3 className="text-sm font-medium text-gray-400 mb-2">Active Prompt:</h3>
+                <div>
+                  <h3 className="text-xs font-medium text-gray-400 mb-2">Active Prompt:</h3>
                   {isEditingPrompt ? (
                     <textarea
                       value={promptText}
                       onChange={(e) => {
                         setPromptText(e.target.value);
-                        // Auto-resize textarea to fit content
                         e.target.style.height = 'auto';
-                        e.target.style.height = Math.max(96, e.target.scrollHeight) + 'px'; // 96px = min-h-24
+                        e.target.style.height = Math.max(60, e.target.scrollHeight) + 'px';
                       }}
                       onBlur={async () => {
-                        // Auto-save on blur
                         if (promptText !== systemPrompt) {
                           await updateSystemPrompt();
                         } else {
@@ -563,18 +648,17 @@ export default function BusDemo() {
                         }
                       }}
                       onFocus={(e) => {
-                        // Auto-resize on focus to match content
                         e.target.style.height = 'auto';
-                        e.target.style.height = Math.max(96, e.target.scrollHeight) + 'px';
+                        e.target.style.height = Math.max(60, e.target.scrollHeight) + 'px';
                       }}
-                      className="w-full min-h-24 px-3 py-3 bg-gray-700/30 border border-gray-500/50 rounded-lg text-gray-300 text-sm resize-y focus:outline-none focus:ring-1 focus:ring-gray-400 focus:bg-gray-700/40"
-                      placeholder="Enter custom prompt for object detection..."
+                      className="w-full min-h-15 px-2 py-2 bg-gray-700/30 border border-gray-500/50 rounded text-gray-300 text-xs resize-y focus:outline-none focus:ring-1 focus:ring-gray-400 focus:bg-gray-700/40"
+                      placeholder="Enter custom prompt..."
                       style={{ overflow: 'hidden' }}
                       autoFocus
                     />
                   ) : (
                     <div 
-                      className="text-sm text-gray-300 bg-gray-700/30 rounded-lg p-3 min-h-24 flex items-start border border-gray-600/30 cursor-text hover:bg-gray-700/40 hover:border-gray-500/40 transition-colors whitespace-pre-wrap"
+                      className="text-xs text-gray-300 bg-gray-700/30 rounded p-2 min-h-15 flex items-start border border-gray-600/30 cursor-text hover:bg-gray-700/40 hover:border-gray-500/40 transition-colors whitespace-pre-wrap"
                       onClick={() => {
                         setPromptText(systemPrompt);
                         setIsEditingPrompt(true);
@@ -587,87 +671,19 @@ export default function BusDemo() {
                 </div>
               </div>
 
-              {/* Inference Mode Toggle */}
-              <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
-                <h2 className="text-xl font-semibold text-white mb-4">Inference Mode</h2>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm font-medium text-gray-300">
-                        {useCloud ? '☁️ Cloud' : '🖥️ Local'}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        {useCloud ? 'Moondream Cloud' : 'Moondream Server'}
-                      </span>
-                    </div>
-                    <button
-                      onClick={toggleInferenceMode}
-                      disabled={(!cloudAvailable && !localAvailable) || isDetecting}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                        useCloud ? 'bg-blue-600' : 'bg-gray-600'
-                      } ${(!cloudAvailable && !localAvailable) || isDetecting ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          useCloud ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                    </button>
+              {/* Performance Stats */}
+              <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
+                <h2 className="text-lg font-semibold text-white mb-3">Performance Stats</h2>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="text-center p-2 bg-gray-700/30 rounded">
+                    <div className="text-xl font-bold text-blue-400">{detectionResults.length}</div>
+                    <div className="text-xs text-gray-400">Detections</div>
                   </div>
-                  <div className="text-xs text-gray-500">
-                    Cloud: {cloudAvailable ? '✅ Available' : '❌ Unavailable'} • 
-                    Local: {localAvailable ? '✅ Available' : '❌ Unavailable'}
-                  </div>
-                </div>
-              </div>
-
-              {/* Detection Controls */}
-              <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
-                <h2 className="text-xl font-semibold text-white mb-4">Detection Controls</h2>
-                <div className="space-y-4">
-                  <button
-                    onClick={startDetection}
-                    disabled={(detectionMode === 'video' && !selectedVideo) || isDetecting}
-                    className={`w-full py-3 px-4 rounded-lg font-medium transition-all duration-200 ${
-                      (detectionMode === 'video' && !selectedVideo) || isDetecting
-                        ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
-                        : 'bg-green-600 hover:bg-green-700 text-white shadow-lg hover:shadow-green-600/25'
-                    }`}
-                  >
-                    {isDetecting ? (
-                      <div className="flex items-center justify-center space-x-2">
-                        <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
-                        <span>Detecting...</span>
-                      </div>
-                    ) : (
-                      '🔍 Watch for Objects'
-                    )}
-                  </button>
-                  
-                  {isDetecting && (
-                    <button
-                      onClick={stopDetection}
-                      className="w-full py-2 px-4 rounded-lg font-medium bg-red-600 hover:bg-red-700 text-white transition-all duration-200"
-                    >
-                      Stop Detection
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Stats */}
-              <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
-                <h2 className="text-xl font-semibold text-white mb-4">Performance Stats</h2>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center p-3 bg-gray-700/30 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-400">{detectionResults.length}</div>
-                    <div className="text-sm text-gray-400">Detections</div>
-                  </div>
-                  <div className="text-center p-3 bg-gray-700/30 rounded-lg">
-                    <div className="text-2xl font-bold text-green-400">
+                  <div className="text-center p-2 bg-gray-700/30 rounded">
+                    <div className="text-xl font-bold text-green-400">
                       {averageLatency > 0 ? `${averageLatency.toFixed(0)}ms` : '-'}
                     </div>
-                    <div className="text-sm text-gray-400">Avg Latency</div>
+                    <div className="text-xs text-gray-400">Avg Latency</div>
                   </div>
                 </div>
               </div>
